@@ -23,14 +23,19 @@ Sistem ini dirancang untuk mengatasi masalah bengkel tradisional: **Sistem harus
 ---
 
 ## 📸 Tampilan Aplikasi
-<img width="1919" height="943" alt="image" src="https://github.com/user-attachments/assets/86411f59-f1f1-425d-894f-71ae45c8b55b" />
 
+* **DESKTOP**
+1. <img width="1919" height="943" alt="image" src="https://github.com/user-attachments/assets/86411f59-f1f1-425d-894f-71ae45c8b55b" />
+2. <img width="1919" height="952" alt="image" src="https://github.com/user-attachments/assets/fb09c76f-4e15-4198-8e54-b05c39cace92" />
+3. <img width="1919" height="952" alt="image" src="https://github.com/user-attachments/assets/6ee52615-2e8c-4ce2-a942-46d4015fcb5d" />
 
-> **Note:** (Silakan ganti link di bawah ini dengan link screenshot aplikasi Bos yang sebenarnya. Cara mudahnya: *drag & drop* gambar langsung ke area text editor GitHub ini).
-
-| Desktop POS (Kasir) | Mobile Web (Gudang & Owner) |
-| :---: | :---: |
-| ![Kasir PC](link_gambar_kasir_pc_di_sini) | ![Gudang Mobile](link_gambar_gudang_hp_di_sini) |
+* **MOBILE**
+1. <img width="720" height="1343" alt="image" src="https://github.com/user-attachments/assets/8fd012c6-a53b-4e6c-b7b4-09f20f2d6ba0" />
+2. <img width="720" height="1346" alt="image" src="https://github.com/user-attachments/assets/4945d5c3-5b4f-477b-9a27-8a3e9e8f0973" />
+3. <img width="720" height="1352" alt="image" src="https://github.com/user-attachments/assets/407170b6-d2ff-4fe9-9ab5-6aabccc1b493" />
+4. <img width="720" height="1361" alt="image" src="https://github.com/user-attachments/assets/b0fc7862-8159-4ff6-8300-ca462efcffc3" />
+5. <img width="720" height="1344" alt="image" src="https://github.com/user-attachments/assets/91e1f00f-7e33-4058-b51d-7e9eac67a754" />
+6. <img width="720" height="1343" alt="image" src="https://github.com/user-attachments/assets/6d3fd151-c9a5-40c5-a26b-3f33a77da028" />
 
 ---
 
