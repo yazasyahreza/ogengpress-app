@@ -26,7 +26,7 @@ Sistem ini dirancang untuk mengatasi masalah bengkel tradisional: **Sistem harus
 
 | Desktop POS (Kasir) | Mobile Web (Gudang & Owner) |
 | :---: | :---: |
-| ![Kasir PC]<img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/add4e225-bb78-4d8f-ae58-085d6e375552" /> | ![Gudang Mobile]<img width="720" height="1361" alt="image" src="https://github.com/user-attachments/assets/8d134047-994f-4644-9509-ed20df25213b" /> | 
+| ![Kasir PC]<img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/add4e225-bb78-4d8f-ae58-085d6e375552" /> Dilengkapi dengan penggunaan Scanner | ![Gudang Mobile] <img width="720" height="1351" alt="image" src="https://github.com/user-attachments/assets/4b9c183c-f325-4d94-8d8b-002803595bf4" /> Tombol robot(AI) yang bisa di pindah-pindah | 
 
 ---
 
