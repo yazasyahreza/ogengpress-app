@@ -10,6 +10,12 @@
   --accent-green: #10b981;
 }
 
+#root {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   margin: 0;
   background-color: var(--bg-color);

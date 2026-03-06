@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Product, CartItem, PaymentMethod } from "../types";
 
-// --- ICONS ---
+// --- ASSETS: ICONS (Minified) ---
 const Icons = {
   Alert: () => (
     <svg
@@ -30,53 +30,6 @@ const Icons = {
       <polyline points="22 4 12 14.01 9 11.01" />
     </svg>
   ),
-  Cash: () => (
-    <svg
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <rect x="2" y="5" width="20" height="14" rx="2" />
-      <line x1="2" y1="10" x2="22" y2="10" />
-    </svg>
-  ),
-  Card: () => (
-    <svg
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <rect x="2" y="5" width="20" height="14" rx="2" />
-      <line x1="2" y1="10" x2="22" y2="10" />
-      <line x1="6" y1="15" x2="6.01" y2="15" />
-      <line x1="10" y1="15" x2="13" y2="15" />
-    </svg>
-  ),
-  Qr: () => (
-    <svg
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M3 7V5a2 2 0 0 1 2-2h2" />
-      <path d="M17 3h2a2 2 0 0 1 2 2v2" />
-      <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
-      <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
-      <rect x="7" y="7" width="3" height="3" />
-      <rect x="14" y="7" width="3" height="3" />
-      <rect x="7" y="14" width="3" height="3" />
-      <path d="M14 14h3v3h-3z" />
-    </svg>
-  ),
   CartCheck: () => (
     <svg
       width="40"
@@ -90,6 +43,274 @@ const Icons = {
       <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
     </svg>
   ),
+  Search: () => (
+    <svg
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  ),
+  Plus: () => (
+    <svg
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      viewBox="0 0 24 24"
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  ),
+};
+
+// --- LOGIKA: PENCARIAN PINTAR (Smart Search) ---
+const levenshtein = (a: string, b: string): number => {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  if (Math.abs(a.length - b.length) > 1) return 2;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1))
+        matrix[i][j] = matrix[i - 1][j - 1];
+      else
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1),
+        );
+    }
+  }
+  return matrix[b.length][a.length];
+};
+
+const smartFilter = (products: Product[], query: string): Product[] => {
+  if (!query) return [];
+  const queryTerms = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length > 0);
+  return products.filter((p) => {
+    const rawData =
+      `${p.name} ${p.barcode} ${p.brand || ""} ${p.item_number || ""} ${p.compatibility || ""} ${p.category || ""}`.toLowerCase();
+    const cleanData = rawData.replace(/[^a-z0-9]/g, "");
+
+    // Cek apakah SEMUA kata kunci user ada di data barang (urutan bebas)
+    return queryTerms.every((term) => {
+      if (rawData.includes(term)) return true;
+      const cleanTerm = term.replace(/[^a-z0-9]/g, "");
+      if (cleanTerm.length > 0 && cleanData.includes(cleanTerm)) return true;
+
+      // Fuzzy Logic (Typo tolerance) untuk kata > 3 huruf
+      if (term.length > 3) {
+        const wordsInData = rawData.split(" ");
+        return wordsInData.some(
+          (word) =>
+            Math.abs(word.length - term.length) <= 1 &&
+            levenshtein(word, term) <= 1,
+        );
+      }
+      return false;
+    });
+  });
+};
+
+// --- COMPONENT: SMART SEARCH ---
+const SmartSearch = ({
+  products,
+  onSelect,
+  onManual,
+}: {
+  products: Product[];
+  onSelect: (p: Product) => void;
+  onManual: () => void;
+}) => {
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, []);
+
+  useEffect(() => {
+    if (!query) {
+      setSuggestions([]);
+      return;
+    }
+    const matches = smartFilter(products, query);
+    setSuggestions(matches.slice(0, 8));
+    setSelectedIndex(0);
+  }, [query, products]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) =>
+        prev < suggestions.length - 1 ? prev + 1 : prev,
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const exactMatch = products.find((p) => p.barcode === query);
+      if (exactMatch) selectItem(exactMatch);
+      else if (suggestions.length > 0) selectItem(suggestions[selectedIndex]);
+    } else if (e.key === "Escape") setSuggestions([]);
+  };
+
+  const selectItem = (p: Product) => {
+    onSelect(p);
+    setQuery("");
+    setSuggestions([]);
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div style={{ position: "relative", width: "100%", marginBottom: 20 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "8px",
+        }}
+      >
+        <label
+          style={{ fontWeight: "bold", color: "#cbd5e1", fontSize: "0.9rem" }}
+        >
+          Cari Barang
+        </label>
+        <button
+          onClick={onManual}
+          style={{
+            background: "rgba(59, 130, 246, 0.15)",
+            color: "#60a5fa",
+            border: "1px solid #3b82f6",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontSize: "0.75rem",
+            fontWeight: "bold",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <Icons.Plus /> Manual
+        </button>
+      </div>
+      <div style={{ position: "relative" }}>
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Scan / Ketik nama barang..."
+          style={{
+            width: "100%",
+            padding: "12px 15px 12px 40px",
+            border: "1px solid #3b82f6",
+            borderRadius: "8px",
+            background: "#334155",
+            color: "#f8fafc",
+            outline: "none",
+            boxSizing: "border-box",
+            fontSize: "1rem",
+            fontWeight: "500",
+          }}
+        />
+        <div
+          style={{ position: "absolute", left: 12, top: 12, color: "#94a3b8" }}
+        >
+          <Icons.Search />
+        </div>
+      </div>
+      {suggestions.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
+            background: "#1e293b",
+            border: "1px solid #475569",
+            borderRadius: "0 0 8px 8px",
+            maxHeight: "350px",
+            overflowY: "auto",
+            zIndex: 100,
+            boxShadow: "0 10px 20px rgba(0,0,0,0.5)",
+          }}
+        >
+          {suggestions.map((p, idx) => (
+            <div
+              key={p.id}
+              onClick={() => selectItem(p)}
+              style={{
+                padding: "12px 15px",
+                cursor: "pointer",
+                background: idx === selectedIndex ? "#3b82f6" : "transparent",
+                color: idx === selectedIndex ? "white" : "#cbd5e1",
+                borderBottom: "1px solid #334155",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: "bold", fontSize: "0.95rem" }}>
+                  {p.name}
+                </div>
+                <div
+                  style={{ fontSize: "0.75rem", opacity: 0.8, marginTop: 2 }}
+                >
+                  {p.brand ? `${p.brand} • ` : ""} Kode: {p.barcode}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div
+                  style={{
+                    fontWeight: "bold",
+                    color: idx === selectedIndex ? "white" : "#fbbf24",
+                  }}
+                >
+                  Rp {p.price.toLocaleString("id-ID")}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    marginTop: 2,
+                    color:
+                      p.stock <= 2
+                        ? idx === selectedIndex
+                          ? "#fca5a5"
+                          : "#ef4444"
+                        : idx === selectedIndex
+                          ? "#86efac"
+                          : "#10b981",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Stok: {p.stock}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 interface KasirProps {
@@ -109,8 +330,6 @@ export default function Kasir({
   pay,
   setPay,
 }: KasirProps) {
-  const [scan, setScan] = useState("");
-  // [DIHAPUS] State licensePlate
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("TUNAI");
   const [discountInput, setDiscountInput] = useState("");
   const [toast, setToast] = useState<{
@@ -118,15 +337,16 @@ export default function Kasir({
     msg: string;
     type: "success" | "error";
   }>({ show: false, msg: "", type: "success" });
-
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
 
-  const scanRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setTimeout(() => scanRef.current?.focus(), 100);
-  }, []);
+  // ✨ PERBAIKAN: STATE MANUAL DITAMBAH COST PRICE ✨
+  const [manualForm, setManualForm] = useState({
+    name: "",
+    price: "",
+    cost_price: "",
+  });
 
   const formatRp = (num: number) => "Rp " + num.toLocaleString("id-ID");
 
@@ -137,48 +357,52 @@ export default function Kasir({
     }, 3000);
   };
 
-  const handleAddItem = (barcode: string) => {
-    const p = products.find((i) => i.barcode === barcode);
-    if (!p) return false;
-    const exist = cart.find((c) => c.id === p.id);
+  const handleAddItem = (product: Product) => {
+    const exist = cart.find((c) => c.id === product.id);
     const currentQty = exist ? Number(exist.qty) : 0;
-    if (currentQty + 1 > p.stock) {
-      showNotification(`Stok habis! Sisa: ${p.stock}`, "error");
-      return true;
+    // Cek Stok untuk barang DB (id berupa number)
+    if (typeof product.id === "number" && currentQty + 1 > product.stock) {
+      showNotification(
+        `Stok ${product.name} habis! Sisa: ${product.stock}`,
+        "error",
+      );
+      return;
     }
     if (exist) {
       setCart(
-        cart.map((c) => (c.id === p.id ? { ...c, qty: Number(c.qty) + 1 } : c))
+        cart.map((c) =>
+          c.id === product.id ? { ...c, qty: Number(c.qty) + 1 } : c,
+        ),
       );
     } else {
-      setCart([...cart, { ...p, qty: 1 }]);
+      setCart([...cart, { ...product, qty: 1 }]);
     }
-    return true;
   };
 
-  const handleScanChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setScan(e.target.value);
-  };
+  // ✨ PERBAIKAN: FUNGSI SUBMIT MANUAL DITAMBAH COST PRICE ✨
+  const handleManualSubmit = () => {
+    if (!manualForm.name || !manualForm.price)
+      return showNotification("Nama & Harga harus diisi!", "error");
 
-  useEffect(() => {
-    if (!scan) return;
-    const found = products.find((p) => p.barcode === scan);
-    if (found) {
-      const timer = setTimeout(() => {
-        handleAddItem(scan);
-        setScan("");
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [scan, products, cart]);
+    const price = parseInt(manualForm.price.replace(/\D/g, "")) || 0;
+    const cost = parseInt(manualForm.cost_price.replace(/\D/g, "")) || 0;
 
-  const handleScanSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!scan) return;
-    const found = products.find((p) => p.barcode === scan);
-    if (found) return;
-    showNotification("Barang tidak ditemukan!", "error");
-    setScan("");
+    const manualProduct: any = {
+      id: `MANUAL-${Date.now()}`,
+      name: manualForm.name,
+      price: price,
+      cost_price: cost, // Modal masuk sini
+      stock: 999999,
+      barcode: "MANUAL",
+      category: "Manual",
+      brand: "-",
+      item_number: "-",
+      isManual: true,
+    };
+    handleAddItem(manualProduct);
+    setManualForm({ name: "", price: "", cost_price: "" });
+    setShowManualModal(false);
+    showNotification("Barang manual ditambahkan", "success");
   };
 
   const handleQtyChange = (id: number, val: string) => {
@@ -197,14 +421,13 @@ export default function Kasir({
     if (!item) return;
     let finalQty = Number(item.qty);
     if (item.qty === "" || finalQty < 1) finalQty = 1;
-    if (finalQty > item.stock) {
+    if (typeof item.id === "number" && finalQty > item.stock) {
       showNotification(`Stok terbatas. Max: ${item.stock}`, "error");
       finalQty = item.stock;
     }
     setCart(cart.map((c) => (c.id === id ? { ...c, qty: finalQty } : c)));
   };
 
-  // --- LOGIKA HITUNG ---
   const subTotal = cart.reduce((a, b) => a + b.price * Number(b.qty), 0);
   let discountValue = 0;
   if (discountInput.includes("%")) {
@@ -213,6 +436,7 @@ export default function Kasir({
   } else {
     discountValue = parseFloat(discountInput.replace(/\D/g, "")) || 0;
   }
+
   if (discountValue > subTotal) discountValue = subTotal;
   const grandTotal = subTotal - discountValue;
   const moneyReceived =
@@ -228,23 +452,20 @@ export default function Kasir({
     setShowConfirmModal(true);
   };
 
-  // [DIKEMBALIKAN KE AWAL] Fungsi Final Checkout TANPA Plat Nomor
   const handleFinalCheckout = async () => {
     setIsProcessing(true);
     const cleanCart = cart.map((c) => ({ ...c, qty: Number(c.qty) || 1 }));
 
-    // @ts-ignore
+    // [PERBAIKAN] Tidak perlu @ts-ignore karena types/index.ts sudah diupdate
     const res = await window.api.createTransaction(
       cleanCart,
       subTotal,
       discountValue,
-      paymentMethod
-      // Param ke-5 (licensePlate) SUDAH DIHAPUS
+      paymentMethod,
     );
 
     setIsProcessing(false);
     setShowConfirmModal(false);
-
     if (res.success) {
       showNotification("Transaksi Berhasil!", "success");
       setCart([]);
@@ -252,7 +473,6 @@ export default function Kasir({
       setDiscountInput("");
       setPaymentMethod("TUNAI");
       onSuccess();
-      setTimeout(() => scanRef.current?.focus(), 100);
     } else {
       showNotification("Gagal: " + res.error, "error");
     }
@@ -265,11 +485,21 @@ export default function Kasir({
         if (showConfirmModal) handleFinalCheckout();
         else if (cart.length > 0) handlePreCheckout();
       }
-      if (e.key === "Escape" && showConfirmModal) setShowConfirmModal(false);
+      if (e.key === "Escape") {
+        if (showConfirmModal) setShowConfirmModal(false);
+        if (showManualModal) setShowManualModal(false);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [cart, pay, discountInput, paymentMethod, showConfirmModal]); // Dependency licensePlate dihapus
+  }, [
+    cart,
+    pay,
+    discountInput,
+    paymentMethod,
+    showConfirmModal,
+    showManualModal,
+  ]);
 
   return (
     <div
@@ -299,7 +529,7 @@ export default function Kasir({
         @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       `}</style>
 
-      {/* CUSTOM MODAL */}
+      {/* MODAL KONFIRMASI BAYAR */}
       {showConfirmModal && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -336,9 +566,6 @@ export default function Kasir({
             >
               Pastikan uang diterima sudah sesuai.
             </p>
-
-            {/* [DIHAPUS] Bagian Tampilan Plat Nomor di Modal */}
-
             <div
               style={{
                 background: "#0f172a",
@@ -435,7 +662,166 @@ export default function Kasir({
         </div>
       )}
 
-      {/* TOAST */}
+      {/* ✨ MODAL INPUT MANUAL PC (DIUBAH) ✨ */}
+      {showManualModal && (
+        <div className="modal-overlay">
+          <div
+            className="modal-content"
+            style={{ width: "420px", padding: "30px" }}
+          >
+            <h3
+              style={{
+                margin: "0 0 25px 0",
+                color: "#f8fafc",
+                fontSize: "1.2rem",
+              }}
+            >
+              Input Barang Manual
+            </h3>
+
+            <div style={{ marginBottom: "15px", textAlign: "left" }}>
+              <label
+                style={{
+                  color: "#cbd5e1",
+                  fontSize: "0.9rem",
+                  display: "block",
+                  marginBottom: "6px",
+                }}
+              >
+                Nama Barang / Jasa
+              </label>
+              <input
+                autoFocus
+                placeholder="Contoh: Ongkos Pasang"
+                value={manualForm.name}
+                onChange={(e) =>
+                  setManualForm({ ...manualForm, name: e.target.value })
+                }
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  background: "#0f172a",
+                  border: "1px solid #475569",
+                  color: "white",
+                  fontSize: "1rem",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* KOTAK HARGA DIBELAH DUA (KIRI MODAL, KANAN JUAL) */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "15px",
+                marginBottom: "30px",
+                textAlign: "left",
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    color: "#94a3b8",
+                    fontSize: "0.9rem",
+                    display: "block",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Harga Modal (Rp)
+                </label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={manualForm.cost_price}
+                  onChange={(e) =>
+                    setManualForm({ ...manualForm, cost_price: e.target.value })
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    borderRadius: "8px",
+                    background: "#0f172a",
+                    border: "1px solid #475569",
+                    color: "#cbd5e1",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    color: "#fbbf24",
+                    fontSize: "0.9rem",
+                    display: "block",
+                    marginBottom: "6px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Harga Jual (Rp)
+                </label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={manualForm.price}
+                  onChange={(e) =>
+                    setManualForm({ ...manualForm, price: e.target.value })
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    borderRadius: "8px",
+                    background: "#0f172a",
+                    border: "1px solid #fbbf24",
+                    color: "#fbbf24",
+                    fontWeight: "bold",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                onClick={() => setShowManualModal(false)}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  background: "transparent",
+                  border: "1px solid #475569",
+                  color: "#cbd5e1",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                }}
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleManualSubmit}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  background: "#3b82f6",
+                  border: "none",
+                  color: "white",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                }}
+              >
+                Tambahkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST NOTIFIKASI */}
       <div
         style={{
           position: "fixed",
@@ -481,7 +867,6 @@ export default function Kasir({
         </div>
       </div>
 
-      {/* KIRI: KERANJANG */}
       <div
         className="content-area"
         style={{
@@ -558,7 +943,7 @@ export default function Kasir({
                       >
                         🛒
                       </div>
-                      <i>Belum ada barang yang discan.</i>
+                      <i>Cari barang untuk memulai transaksi.</i>
                     </td>
                   </tr>
                 ) : (
@@ -571,7 +956,15 @@ export default function Kasir({
                       <td style={{ padding: "16px 20px", color: "#f8fafc" }}>
                         <div style={{ fontWeight: "600" }}>{c.name}</div>
                         <div style={{ fontSize: "0.8rem", color: "#64748b" }}>
-                          {c.barcode}
+                          {c.barcode === "MANUAL" ? (
+                            <span
+                              style={{ color: "#60a5fa", fontWeight: "bold" }}
+                            >
+                              INPUT MANUAL
+                            </span>
+                          ) : (
+                            c.barcode
+                          )}
                         </div>
                       </td>
                       <td style={{ padding: "16px 20px", color: "#cbd5e1" }}>
@@ -582,9 +975,9 @@ export default function Kasir({
                           type="number"
                           value={c.qty}
                           onChange={(e) =>
-                            handleQtyChange(c.id, e.target.value)
+                            handleQtyChange(c.id as any, e.target.value)
                           }
-                          onBlur={() => handleQtyBlur(c.id)}
+                          onBlur={() => handleQtyBlur(c.id as any)}
                           style={{
                             width: "50px",
                             textAlign: "center",
@@ -636,7 +1029,6 @@ export default function Kasir({
         </div>
       </div>
 
-      {/* KANAN: PANEL PEMBAYARAN */}
       <div
         className="sidebar custom-scroll"
         style={{
@@ -648,9 +1040,6 @@ export default function Kasir({
           overflowY: "auto",
         }}
       >
-        {/* [DIHAPUS] Input Plat Nomor */}
-
-        {/* Scan Barcode */}
         <div
           style={{
             background: "#0f172a",
@@ -660,42 +1049,12 @@ export default function Kasir({
             marginBottom: "20px",
           }}
         >
-          <label
-            style={{
-              display: "block",
-              marginBottom: "10px",
-              fontWeight: "bold",
-              color: "#cbd5e1",
-              fontSize: "0.9rem",
-            }}
-          >
-            Scan Barcode
-          </label>
-          <form onSubmit={handleScanSubmit}>
-            <input
-              ref={scanRef}
-              value={scan}
-              onChange={handleScanChange}
-              placeholder="Scan barang..."
-              autoFocus
-              style={{
-                width: "100%",
-                padding: "12px 15px",
-                border: "1px solid #475569",
-                borderRadius: "8px",
-                background: "#334155",
-                color: "#f8fafc",
-                outline: "none",
-                boxSizing: "border-box",
-                transition: "border 0.2s",
-              }}
-              onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
-              onBlur={(e) => (e.target.style.borderColor = "#475569")}
-            />
-          </form>
+          <SmartSearch
+            products={products}
+            onSelect={handleAddItem}
+            onManual={() => setShowManualModal(true)}
+          />
         </div>
-
-        {/* Kalkulasi */}
         <div
           style={{
             background: "#0f172a",
@@ -725,7 +1084,9 @@ export default function Kasir({
               marginBottom: "15px",
             }}
           >
-            <span style={{ color: "#94a3b8", fontSize: "0.9rem" }}>Diskon</span>
+            <span style={{ color: "#94a3b8", fontSize: "0.9rem" }}>
+              Potongan
+            </span>
             <input
               value={discountInput}
               onChange={(e) => setDiscountInput(e.target.value)}
@@ -773,56 +1134,78 @@ export default function Kasir({
             {formatRp(grandTotal)}
           </div>
         </div>
-
-        {/* Metode Pembayaran */}
         <div style={{ marginBottom: "20px" }}>
-          <label
+          <div
             style={{
-              display: "block",
-              marginBottom: "10px",
-              fontWeight: "bold",
-              color: "#cbd5e1",
-              fontSize: "0.9rem",
+              fontSize: "0.85rem",
+              color: "#94a3b8",
+              marginBottom: "8px",
+              fontWeight: "500",
             }}
           >
             Metode Pembayaran
-          </label>
+          </div>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: "10px",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "12px",
             }}
           >
-            {[
-              { id: "TUNAI", icon: <Icons.Cash />, label: "Tunai" },
-              { id: "QRIS", icon: <Icons.Qr />, label: "QRIS" },
-              { id: "DEBIT", icon: <Icons.Card />, label: "Debit" },
-            ].map((m) => (
+            {["TUNAI", "QRIS"].map((m) => (
               <button
-                key={m.id}
-                onClick={() => setPaymentMethod(m.id as PaymentMethod)}
-                className={`pay-btn ${paymentMethod === m.id ? "active" : ""}`}
+                key={m}
+                onClick={() => setPaymentMethod(m as PaymentMethod)}
                 style={{
                   padding: "12px",
                   borderRadius: "8px",
+                  border:
+                    paymentMethod === m
+                      ? "1px solid #3b82f6"
+                      : "1px solid #334155",
+                  background:
+                    paymentMethod === m ? "rgba(59, 130, 246, 0.2)" : "#1e293b",
+                  color: paymentMethod === m ? "#60a5fa" : "#94a3b8",
                   cursor: "pointer",
+                  fontWeight: "600",
+                  fontSize: "0.9rem",
+                  transition: "all 0.2s",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
+                  justifyContent: "center",
                   gap: "6px",
-                  transition: "0.2s",
                 }}
               >
-                {m.icon}
-                <span style={{ fontSize: "0.75rem", fontWeight: "600" }}>
-                  {m.label}
-                </span>
+                {m === "TUNAI" ? (
+                  <svg
+                    width="24"
+                    height="24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                    <line x1="2" y1="10" x2="22" y2="10" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="24"
+                    height="24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" />
+                  </svg>
+                )}
+                {m}
               </button>
             ))}
           </div>
         </div>
-
         {paymentMethod === "TUNAI" && (
           <div style={{ marginBottom: "20px" }}>
             <label
@@ -855,7 +1238,6 @@ export default function Kasir({
             />
           </div>
         )}
-
         <div
           style={{
             display: "flex",
@@ -881,7 +1263,6 @@ export default function Kasir({
             {formatRp(kembalian < 0 ? 0 : kembalian)}
           </strong>
         </div>
-
         <button
           onClick={handlePreCheckout}
           disabled={!cart.length}

@@ -1,8 +1,32 @@
 {
   "name": "kasir-ogengpress",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "version": "1.0.0",
+  "description": "Aplikasi Manajemen Gudang & Kasir Ogeng Press",
+  "main": "dist-electron/main.js",
+  "author": "Syahreza",
+  "build": {
+    "appId": "com.ogeng.press",
+    "productName": "Kasir Ogeng Press",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
   "scripts": {
     "dev": "vite --host",
     "build": "tsc && vite build && electron-builder",
@@ -10,13 +34,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "better-sqlite3": "^12.5.0",
     "cors": "^2.8.5",
+    "cropperjs": "^1.6.2",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "html5-qrcode": "^2.3.8",
     "ip": "^2.0.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-cropper": "^2.3.3",
+    "react-dom": "^18.2.0",
+    "recharts": "^3.6.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
@@ -38,6 +67,5 @@
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5"
-  },
-  "main": "dist-electron/main.js"
+  }
 }

@@ -1,42 +1,38 @@
-// --- TIPE DATA OBJECT ---
+// ==========================================
+//  A. DATA INTERFACES (Model Data)
+// ==========================================
+
 export interface Product {
   id: number;
   barcode: string;
   name: string;
-  cost_price: number; // Modal
-  price: number; // Jual
+  cost_price: number; // Harga Modal
+  price: number; // Harga Jual
   stock: number;
   category?: string;
   item_number?: string;
   brand?: string;
   compatibility?: string;
+  image_url?: string;
   created_at?: string;
 }
 
 export interface CartItem extends Product {
   qty: number | string;
+  isManual?: boolean;
 }
 
-// Definisi Metode Pembayaran
-export type PaymentMethod = "TUNAI" | "QRIS" | "DEBIT";
+export type PaymentMethod = "TUNAI" | "QRIS";
 
 export interface Transaction {
   id: number;
   payment_date: string;
-  payment_method: string;
+  payment_method: PaymentMethod;
   items_summary: string;
   gross_total: number;
   discount: number;
   net_total: number;
   profit: number;
-  // [DIHAPUS] license_plate
-}
-
-export interface TransactionDetail {
-  product_name: string;
-  qty: number;
-  price_at_transaction: number;
-  cost_at_transaction: number;
 }
 
 export interface DailyReport {
@@ -45,23 +41,23 @@ export interface DailyReport {
   total_discount: number;
   net_sales: number;
   total_profit: number;
+  tunai_today: number;
+  qris_today: number;
+  is_manual?: boolean;
 }
 
-// Interface untuk Laporan Mingguan, Bulanan, & Harian (History)
+// Laporan Grafik & History
 export interface PeriodReport {
-  period_id: string;
-  label: string;
-  start_date?: string;
-  end_date?: string;
+  period_id: string; // Tgl (2024-02-20) atau Bulan (2024-02)
+  label?: string;
   revenue: number;
   expense: number;
   profit: number;
-  tunai: number;
-  qris: number;
-  debit: number;
+  tunai?: number;
+  qris?: number;
+  isManual?: boolean; // Penanda jika data hasil adjustment
 }
 
-// Interface untuk Produk Terlaris
 export interface TopProduct {
   category: string;
   name: string;
@@ -71,64 +67,113 @@ export interface TopProduct {
   total_revenue: number;
 }
 
-// --- DEFINISI GLOBAL WINDOW.API (PENTING!) ---
+// Barang Kosong / Missed Items
+export interface MissedItem {
+  id: number;
+  name: string;
+  count: number;
+  last_requested: string;
+}
+
+// ==========================================
+//  B. GLOBAL WINDOW API (Jembatan ke Electron)
+// ==========================================
+
 declare global {
   interface Window {
     api: {
-      // Produk
+      // 1. MANAJEMEN PRODUK
       fetchProducts: () => Promise<Product[]>;
-      addProduct: (data: any) => Promise<any>;
-      editProduct: (id: number, data: any) => Promise<any>;
-      deleteProduct: (id: number) => Promise<any>;
+      addProduct: (
+        data: any,
+      ) => Promise<{ success: boolean; id?: number; error?: string }>;
+      editProduct: (
+        id: number,
+        data: any,
+      ) => Promise<{ success: boolean; error?: string }>;
+      // [UPDATE] Tambah error?: string
+      deleteProduct: (id: number) => Promise<{
+        success: boolean;
+        reason?: string;
+        msg?: string;
+        error?: string;
+      }>;
 
-      // Transaksi
-      // [DIKEMBALIKAN KE 4 PARAMETER]
+      // 2. TRANSAKSI (KASIR)
       createTransaction: (
         items: any[],
         total: number,
         discount: number,
-        paymentMethod: string
-        // Parameter licensePlate SUDAH DIHAPUS
-      ) => Promise<any>;
+        paymentMethod: string,
+      ) => Promise<{ success: boolean; id?: number; error?: string }>;
 
-      fetchTransactions: () => Promise<Transaction[]>;
-      fetchTodayTransactions: () => Promise<Transaction[]>;
-      fetchTransactionDetails: (id: number) => Promise<TransactionDetail[]>;
-      deleteTransaction: (id: number) => Promise<any>;
+      deleteTransaction: (
+        id: number,
+      ) => Promise<{ success: boolean; error?: string }>;
+      updateTransaction: (
+        id: number,
+        data: any,
+      ) => Promise<{ success: boolean; error?: string }>;
+      resetTransactions: () => Promise<{ success: boolean; error?: string }>;
 
-      // [DIHAPUS] getHistoryByPlate
-
-      // Konfirmasi Pembayaran
-      confirmPayment: (details: any) => Promise<boolean>;
-
-      // Laporan
+      // 3. LAPORAN & KEUANGAN
       fetchTodayReport: () => Promise<DailyReport>;
-
-      // Tambahan agar Laporan.tsx tidak error juga
-      fetchStockLogs: () => Promise<any[]>;
-      fetchMonthlyChart: () => Promise<any[]>;
-
-      // Riwayat Harian (Grid Card)
+      fetchTodayTransactions: () => Promise<Transaction[]>;
+      fetchFinanceSummary: () => Promise<any[]>; // Laporan Gabungan
       fetchDailyHistory: () => Promise<PeriodReport[]>;
 
-      // Laporan Mingguan & Bulanan (Table)
-      fetchWeeklyReport: () => Promise<PeriodReport[]>;
-      fetchMonthlyReport: () => Promise<PeriodReport[]>;
+      // [UPDATE] Tambah error?: string agar Laporan.tsx tidak merah
+      addFinancialRecord: (
+        data: any,
+      ) => Promise<{ success: boolean; id?: number; error?: string }>;
 
-      // Produk Terlaris
+      // 4. GRAFIK & ANALISA
+      fetchMonthlyChart: () => Promise<PeriodReport[]>;
       fetchTopProducts: () => Promise<TopProduct[]>;
 
-      // Sync ke Google Sheets
-      syncToCloud: () => Promise<{ success: boolean; msg: string }>;
+      // [UPDATE] Tambah error?: string
+      saveMonthlyAdjustment: (data: {
+        period: string;
+        targetRevenue: number;
+        targetExpense: number;
+      }) => Promise<{ success: boolean; error?: string }>;
+      // [UPDATE] Tambah error?: string
+      resetMonthlyAdjustment: (
+        period: string,
+      ) => Promise<{ success: boolean; error?: string }>;
 
-      // Backup Database
-      backupDatabase: () => Promise<{
+      // 5. MISSED ITEMS (Barang Kosong)
+      fetchMissedItems: () => Promise<MissedItem[]>;
+      // [UPDATE] Tambah error?: string
+      addMissedItem: (
+        name: string,
+      ) => Promise<{ success: boolean; error?: string }>;
+      // [UPDATE] Tambah error?: string
+      deleteMissedItem: (
+        id: number,
+      ) => Promise<{ success: boolean; error?: string }>;
+
+      // 6. SYSTEM
+      syncToCloud: () => Promise<{ success: boolean; msg: string }>;
+      backupDatabase: () => Promise<{ success: boolean; msg?: string }>;
+      restoreDatabase: () => Promise<{ success: boolean; msg?: string }>;
+
+      // AI
+      askAI: (
+        prompt: string,
+      ) => Promise<{ success: boolean; text?: string; error?: string }>;
+
+      askAIImage: (
+        base64: string,
+      ) => Promise<{
         success: boolean;
-        path?: string;
-        msg?: string;
+        text?: string;
+        searchKeyword?: string;
+        error?: string;
       }>;
 
-      restoreDatabase: () => Promise<{ success: boolean; msg?: string }>;
+      // Server IP Listener (Untuk QR Code)
+      onServerIp: (callback: (ip: string) => void) => void;
     };
   }
 }

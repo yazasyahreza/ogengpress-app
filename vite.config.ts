@@ -7,6 +7,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [
     react(),
+
     electron({
       main: {
         // Shortcut of `build.lib.entry`.
@@ -31,4 +32,9 @@ export default defineConfig({
       renderer: process.env.NODE_ENV === "test" ? undefined : {},
     }),
   ],
+
+  server: {
+    host: true,
+    port: 80, // <--- Ini penawar anti bug WhatsApp!
+  },
 });
