@@ -8,7 +8,7 @@
 
 Ogeng Press Management System adalah aplikasi Kasir (Point of Sales) dan Manajemen Gudang khusus yang dibangun untuk memodernisasi pembukuan bengkel motor. 
 
-Sistem ini dirancang untuk mengatasi masalah bengkel tradisional: **Sistem harus tetap berjalan tanpa kuota internet**, **Owner bengkel bisa memantau laba bersih secara terpisah dari kasir depan**, **Pembukuan laporan yang sangat rapi**, dan **Fitur AI yang mempermudah mekanik**.
+Sistem ini dirancang untuk mengatasi masalah bengkel tradisional: **Sistem harus tetap berjalan tanpa kuota internet**, **Owner bengkel bisa memantau laba bersih secara terpisah dari kasir depan**, **Pencatatan laporan & stok yang sangat rapi**, **Dilengkapi dengan penggunaan Scanner pada kasir**, dan **Fitur AI yang mempermudah mekanik**.
 
 ---
 
@@ -26,9 +26,7 @@ Sistem ini dirancang untuk mengatasi masalah bengkel tradisional: **Sistem harus
 
 | Desktop POS (Kasir) | Mobile Web (Gudang & Owner) |
 | :---: | :---: |
-| ![Kasir PC](<img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/add4e225-bb78-4d8f-ae58-085d6e375552" />
-) | ![Gudang Mobile](<img width="720" height="1361" alt="image" src="https://github.com/user-attachments/assets/8d134047-994f-4644-9509-ed20df25213b" />
-) |
+| ![Kasir PC]<img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/add4e225-bb78-4d8f-ae58-085d6e375552" /> | ![Gudang Mobile]<img width="720" height="1361" alt="image" src="https://github.com/user-attachments/assets/8d134047-994f-4644-9509-ed20df25213b" /> | 
 
 ---
 
