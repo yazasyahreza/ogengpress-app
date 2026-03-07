@@ -16,6 +16,7 @@ Sistem ini dirancang untuk mengatasi masalah bengkel tradisional: **Sistem harus
 
 * **💻 Dual-Interface System:** Aplikasi Desktop (Electron) untuk Kasir Utama, dan Aplikasi Web Mobile (React) untuk akses Owner/Kasir di area gudang.
 * **📡 Local Intranet Mode:** Sinkronisasi data antara PC dan HP secara *real-time* menggunakan jaringan Wi-Fi lokal tanpa memerlukan akses internet/cloud.
+* **🏷️ Barcode Scanner Ready:** Mempercepat proses transaksi di Kasir PC dengan dukungan alat *scanner barcode* fisik dan fitur *Smart Search* untuk input barang instan.
 * **🤖 AI Mechanic Assistant:** Integrasi dengan Google Gemini AI untuk membantu pencarian spesifikasi sparepart motor dan identifikasi visual (mengenali barang lewat foto).
 * **⚡ Optimistic UI Updates:** Memberikan pengalaman interaksi tanpa *loading* di aplikasi mobile saat mengelola data gudang.
 * **📊 Laba Bersih & Analitik:** Pemisahan akses antara harga modal (rahasia owner) dan harga jual (publik kasir), lengkap dengan grafik perbandingan bulanan.
