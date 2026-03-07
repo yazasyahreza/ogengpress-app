@@ -27,7 +27,7 @@ Sistem ini dirancang untuk mengatasi masalah bengkel tradisional: **Sistem harus
 
 | Desktop | Mobile |
 | :---: | :---: |
-| ![Kasir PC] Dilengkapi Dengan Penggunaan Scanner<img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/add4e225-bb78-4d8f-ae58-085d6e375552" /><br><br> ![Laporan PC] Tampilan Grafik Total Bulanan <img width="1919" height="943" alt="image" src="https://github.com/user-attachments/assets/45b14f84-299d-46b7-a06f-74293be38bc3" /> | ![Gudang Mobile] Tombol robot(AI) yang bisa di pindah-pindah <img width="720" height="1351" alt="image" src="https://github.com/user-attachments/assets/4b9c183c-f325-4d94-8d8b-002803595bf4" /><br><br> ![Laporan Mobile] Tampilan Laporan Real Time <img width="720" height="1338" alt="image" src="https://github.com/user-attachments/assets/fa82e195-8c94-4278-8d1a-47336ea02238" /> | 
+| ![Kasir PC] Dilengkapi Dengan Penggunaan Scanner<img width="1919" height="955" alt="image" src="https://github.com/user-attachments/assets/d5c640d9-87f3-4144-997e-aa027ad7c37a" /><br><br> ![Laporan PC] Tampilan Grafik Total Bulanan <img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/d85d712f-c576-41de-ba58-ff83749b66ba" /> | ![Gudang Mobile] Tombol robot(AI) yang bisa di pindah-pindah <img width="720" height="1358" alt="image" src="https://github.com/user-attachments/assets/5bb67fd0-a439-4c07-8fac-b97429043795" /><br><br> ![Laporan Mobile] Tampilan Laporan Real Time <img width="720" height="1342" alt="image" src="https://github.com/user-attachments/assets/ed018501-e2ae-4173-b6c9-e5b85df3187e" /> | 
 
 ---
 
