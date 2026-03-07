@@ -26,7 +26,7 @@ Sistem ini dirancang untuk mengatasi masalah bengkel tradisional: **Sistem harus
 
 | Desktop POS (Kasir) | Mobile Web (Gudang & Owner) |
 | :---: | :---: |
-| ![Kasir PC]<img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/add4e225-bb78-4d8f-ae58-085d6e375552" /> Dilengkapi dengan penggunaan Scanner | ![Gudang Mobile] <img width="720" height="1351" alt="image" src="https://github.com/user-attachments/assets/4b9c183c-f325-4d94-8d8b-002803595bf4" /> Tombol robot(AI) yang bisa di pindah-pindah | 
+| ![Kasir PC]<img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/add4e225-bb78-4d8f-ae58-085d6e375552" /> Dilengkapi Dengan Penggunaan Scanner  <img width="1919" height="943" alt="image" src="https://github.com/user-attachments/assets/45b14f84-299d-46b7-a06f-74293be38bc3" /> Tampilan Grafik Total Bulanan | ![Gudang Mobile] <img width="720" height="1351" alt="image" src="https://github.com/user-attachments/assets/4b9c183c-f325-4d94-8d8b-002803595bf4" /> Tombol robot(AI) yang bisa di pindah-pindah  <img width="720" height="1338" alt="image" src="https://github.com/user-attachments/assets/fa82e195-8c94-4278-8d1a-47336ea02238" /> Tampilan Laporan Real Time | 
 
 ---
 
