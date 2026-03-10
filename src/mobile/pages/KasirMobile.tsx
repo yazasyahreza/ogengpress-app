@@ -239,7 +239,7 @@ export default function KasirMobile() {
   });
 
   const [paymentMethod, setPaymentMethod] = useState<
-    "TUNAI" | "QRIS" | "TRANSFER"
+    "TUNAI" | "QRIS"
   >("TUNAI");
   const [cashReceived, setCashReceived] = useState<string>("");
   const [discount, setDiscount] = useState<string>("");
@@ -693,7 +693,7 @@ export default function KasirMobile() {
         }}
       >
         <div style={{ display: "flex", gap: "8px", marginBottom: "15px" }}>
-          {["TUNAI", "QRIS", "TRANSFER"].map((m) => (
+          {["TUNAI", "QRIS"].map((m) => (
             <button
               key={m}
               onClick={() => {
@@ -1007,7 +1007,7 @@ const qtyBtnStyle = {
   color: "white",
   border: "none",
   borderRadius: "6px",
-  fontWeight: "bold" as "bold",
+  fontWeight: "bold" as const,
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
@@ -1021,7 +1021,7 @@ const inputSearchStyle = {
   color: "white",
   border: "1px solid #3b82f6",
   fontSize: "15px",
-  boxSizing: "border-box" as "border-box",
+  boxSizing: "border-box" as const,
   outline: "none",
 };
 const modalInputStyle = {
@@ -1031,7 +1031,7 @@ const modalInputStyle = {
   background: "#0f172a",
   border: "1px solid #475569",
   color: "white",
-  boxSizing: "border-box" as "border-box",
+  boxSizing: "border-box" as const,
   outline: "none",
 };
 const labelStyle = {

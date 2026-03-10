@@ -17,6 +17,23 @@ const formatRp = (num: number) => `Rp ${Number(num).toLocaleString("id-ID")}`;
 
 // --- ASSETS: ICONS (Minified) ---
 const Icons = {
+  Calendar: () => (
+    <svg
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+    >
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  ),
   Receipt: () => (
     <svg
       width="20"
@@ -189,7 +206,7 @@ const Icons = {
   ),
 };
 
-// --- SUB-COMPONENTS (Dipisah agar performa lebih baik) ---
+// --- SUB-COMPONENTS ---
 const StatCard = ({ title, value, subtext, color, icon }: any) => (
   <div
     style={{
@@ -268,7 +285,7 @@ const ProChart = ({
   };
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" style={{ outline: "none" }}>
       <ComposedChart
         data={data}
         margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
@@ -276,7 +293,7 @@ const ProChart = ({
           if (e && e.activePayload && e.activePayload[0])
             onBarClick(e.activePayload[0].payload);
         }}
-        style={{ cursor: "pointer" }}
+        style={{ cursor: "pointer", outline: "none" }}
       >
         <CartesianGrid
           strokeDasharray="3 3"
@@ -305,8 +322,12 @@ const ProChart = ({
             borderColor: "#334155",
             borderRadius: "8px",
             color: "#fff",
+            outline: "none",
           }}
           formatter={(value: any) => formatRp(value)}
+          cursor={{
+            fill: "rgba(255, 255, 255, 0.05)",
+          }}
         />
         <Legend
           verticalAlign="top"
@@ -338,7 +359,11 @@ const ProChart = ({
           stroke="#fbbf24"
           strokeWidth={2}
           dot={{ r: 4, fill: "#1e293b", stroke: "#fbbf24", strokeWidth: 2 }}
-          activeDot={{ r: 6, onClick: handleItemClick }}
+          activeDot={{
+            r: 6,
+            stroke: "none",
+            onClick: handleItemClick,
+          }}
         />
       </ComposedChart>
     </ResponsiveContainer>
@@ -349,6 +374,11 @@ export default function Laporan() {
   const [mode, setMode] = useState<"transaction" | "products" | "chart">(
     "transaction",
   );
+
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
 
   // --- DATA STATES ---
   const [combinedRecords, setCombinedRecords] = useState<any[]>([]);
@@ -372,10 +402,8 @@ export default function Laporan() {
   // --- MODAL STATES ---
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
-  const [showResetModal, setShowResetModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // [PERBAIKAN] Tipe string agar bisa menerima "MAN-123" atau "TX-123"
   const [transactionToDelete, setTransactionToDelete] = useState<
     string | number | null
   >(null);
@@ -396,7 +424,6 @@ export default function Laporan() {
     isManual: false,
   });
 
-  // [PERBAIKAN] Tipe string di state input agar support angka nol seperti di Mobile
   const [editItemForm, setEditItemForm] = useState({
     id: "" as string | number,
     name: "",
@@ -420,19 +447,18 @@ export default function Laporan() {
 
   useEffect(() => {
     loadData();
-  }, [mode]);
+  }, [mode, selectedDate]);
 
   const loadData = async () => {
     try {
       if (mode === "transaction") {
         const allData = await window.api.fetchFinanceSummary();
-        const today = new Date().toISOString().split("T")[0];
         const todayData = Array.isArray(allData)
-          ? allData.filter((r: any) => r.date.startsWith(today))
+          ? allData.filter((r: any) => r.date.startsWith(selectedDate))
           : [];
         setCombinedRecords(todayData);
 
-        let s = {
+        const s = {
           count: 0,
           gross: 0,
           discount: 0,
@@ -554,21 +580,6 @@ export default function Laporan() {
     }
   };
 
-  const executeResetData = async () => {
-    try {
-      const res = await window.api.resetTransactions();
-      if (res?.success) {
-        showNotification("Reset Berhasil! Memuat ulang...");
-        setTimeout(() => window.location.reload(), 1500);
-      }
-    } catch (e) {
-      showNotification("Gagal Reset", "error");
-    } finally {
-      setShowResetModal(false);
-    }
-  };
-
-  // [PERBAIKAN] Hapus transaksi sekarang support ID Pengeluaran
   const requestDeleteTransaction = (id: string | number) => {
     setTransactionToDelete(id);
     setShowDeleteModal(true);
@@ -577,7 +588,6 @@ export default function Laporan() {
   const confirmDeleteTransaction = async () => {
     if (!transactionToDelete) return;
     try {
-      // PERBAIKAN: Tambahkan "as number" agar TypeScript tidak protes
       const res = await window.api.deleteTransaction(
         transactionToDelete as number,
       );
@@ -596,7 +606,6 @@ export default function Laporan() {
     }
   };
 
-  // [PERBAIKAN] Buka akses Edit untuk Pengeluaran (MAN-) juga
   const handleOpenEditItem = (t: any) => {
     if (
       typeof t.unique_id === "string" &&
@@ -632,7 +641,6 @@ export default function Laporan() {
         paymentMethod: editItemForm.payment,
       };
 
-      // PERBAIKAN: Tambahkan "as number" pada ID-nya
       const res = await window.api.updateTransaction(
         editItemForm.id as number,
         payload,
@@ -682,27 +690,6 @@ export default function Laporan() {
     }
   };
 
-  const resetChartToAuto = async () => {
-    if (
-      confirm(
-        `Kembalikan data bulan ${chartForm.label} ke perhitungan otomatis?`,
-      )
-    ) {
-      try {
-        const res = await window.api.resetMonthlyAdjustment(chartForm.key);
-        if (res.success) {
-          showNotification("Kembali ke Mode Otomatis.", "success");
-          setShowChartEditModal(false);
-          loadData();
-        } else {
-          showNotification("Gagal reset", "error");
-        }
-      } catch (e) {
-        showNotification("Error sistem", "error");
-      }
-    }
-  };
-
   const rankCategories = [
     "Semua",
     ...new Set(
@@ -716,8 +703,6 @@ export default function Laporan() {
     );
   }
   const finalRankData = displayedRankProducts.slice(0, 5);
-
-  const isExpenseEdit = String(editItemForm.id).startsWith("MAN");
 
   return (
     <div
@@ -744,6 +729,13 @@ export default function Laporan() {
         .laporan-row:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(2px); }
         .input-manual { width: 100%; padding: 10px; border-radius: 6px; background: #0f172a; border: 1px solid #475569; color: white; outline: none; margin-bottom: 10px; font-size: 0.9rem; }
+        
+        .recharts-wrapper, .recharts-surface, .recharts-wrapper * {
+          outline: none !important;
+        }
+        svg:focus, g:focus, path:focus, rect:focus {
+          outline: none !important;
+        }
       `}</style>
 
       {/* HEADER UTAMA */}
@@ -776,19 +768,61 @@ export default function Laporan() {
             Ringkasan performa toko Anda hari ini.
           </p>
         </div>
-        <div style={{ display: "flex", gap: "12px" }}>
+
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
           {mode === "transaction" && (
             <>
-              <button
-                className="action-btn danger-ghost"
-                onClick={() => setShowResetModal(true)}
-                title="Reset Data Hari Ini"
+              <div
+                onClick={(e) => {
+                  try {
+                    e.currentTarget.querySelector("input")?.showPicker();
+                  } catch (err) {}
+                }}
+                className="action-btn"
+                style={{
+                  background: "rgba(59, 130, 246, 0.15)",
+                  border: "1px solid rgba(59, 130, 246, 0.4)",
+                  color: "#60a5fa",
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  userSelect: "none",
+                }}
+                title="Pilih Tanggal Laporan"
               >
-                <Icons.Trash />
-              </button>
+                <Icons.Calendar />
+                <span>
+                  {new Date(selectedDate).toLocaleDateString("id-ID", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{
+                    position: "absolute",
+                    width: "0",
+                    height: "0",
+                    opacity: 0,
+                    colorScheme: "dark",
+                  }}
+                />
+              </div>
+
               <button
-                className="action-btn primary"
+                className="action-btn"
                 onClick={() => setShowManualModal(true)}
+                style={{
+                  background: "rgba(239, 68, 68, 0.15)",
+                  border: "1px solid rgba(239, 68, 68, 0.4)",
+                  color: "#f87171",
+                }}
               >
                 <Icons.Plus /> Catat Pengeluaran
               </button>
@@ -1120,7 +1154,6 @@ export default function Laporan() {
                                 </button>
                               )}
 
-                            {/* [PERBAIKAN] Buka gembok hapus untuk semua jenis transaksi */}
                             {t.unique_id &&
                               (t.unique_id.startsWith("TX-") ||
                                 t.unique_id.startsWith("MAN-")) && (
@@ -1697,6 +1730,7 @@ export default function Laporan() {
                     background: "#0f172a",
                     color: "white",
                     fontSize: "1rem",
+                    boxSizing: "border-box", // ✨ KUNCI PRESISI
                   }}
                 />
               </div>
@@ -1734,6 +1768,7 @@ export default function Laporan() {
                     color: "white",
                     fontSize: "1.2rem",
                     fontWeight: "bold",
+                    boxSizing: "border-box", // ✨ KUNCI PRESISI
                   }}
                 />
               </div>
@@ -1762,6 +1797,7 @@ export default function Laporan() {
                       payment: e.target.value as any,
                     })
                   }
+                  className="input-manual"
                   style={{
                     padding: "15px",
                     borderRadius: "10px",
@@ -1770,10 +1806,11 @@ export default function Laporan() {
                     color: "white",
                     fontSize: "1rem",
                     width: "100%",
+                    boxSizing: "border-box",
+                    cursor: "pointer",
                   }}
                 >
                   <option value="TUNAI">TUNAI (Kas Toko)</option>
-                  <option value="TRANSFER">TRANSFER (Rekening)</option>
                 </select>
               </div>
               <div style={{ display: "flex", gap: 15 }}>
@@ -1848,44 +1885,6 @@ export default function Laporan() {
                 }}
               >
                 {isSyncing ? "..." : "Kirim"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showResetModal && (
-        <div className="modal-overlay">
-          <div
-            style={{
-              background: "#1e293b",
-              padding: 30,
-              borderRadius: 16,
-              width: 350,
-              border: "1px solid #334155",
-              textAlign: "center",
-            }}
-          >
-            <h2 style={{ color: "white" }}>Reset Data?</h2>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                onClick={() => setShowResetModal(false)}
-                style={{ flex: 1, padding: 10, borderRadius: 8 }}
-              >
-                Batal
-              </button>
-              <button
-                onClick={executeResetData}
-                style={{
-                  flex: 1,
-                  padding: 10,
-                  borderRadius: 8,
-                  background: "#ef4444",
-                  color: "white",
-                  border: "none",
-                }}
-              >
-                Hapus
               </button>
             </div>
           </div>
@@ -2124,7 +2123,6 @@ export default function Laporan() {
                   >
                     <option value="TUNAI">TUNAI</option>
                     <option value="QRIS">QRIS</option>
-                    <option value="TRANSFER">TRANSFER</option>
                   </select>
                 </div>
               </>

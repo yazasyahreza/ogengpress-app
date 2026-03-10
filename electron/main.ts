@@ -28,7 +28,6 @@ import {
   getDailyHistory,
   resetAllTransactions,
   deleteTransaction,
-  updateTransactionFinancials,
   saveMonthlyLedger,
   getMonthlyLedger,
 } from "./database/db";
@@ -448,7 +447,7 @@ app.whenReady().then(async () => {
         let realRevenue = 0,
           realExpense = 0;
         allTx.forEach((row: any) => {
-          let tDate = new Date(row.payment_date);
+          const tDate = new Date(row.payment_date);
           if (!isNaN(tDate.getTime())) {
             const tKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, "0")}`;
             if (tKey === key) {
@@ -652,9 +651,6 @@ app.whenReady().then(async () => {
         );
 
         let totalProfit = 0;
-        let itemNames = items
-          .map((i: any) => `${i.name} (x${i.qty})`)
-          .join(", ");
 
         items.forEach((item: any) => {
           const profitPerItem = item.price - (item.cost_price || 0);
@@ -707,6 +703,61 @@ app.whenReady().then(async () => {
   server.get("/api/transactions", (_, res) =>
     res.json(getCombinedFinanceReport()),
   );
+  // --- API GRAFIK BULANAN UNTUK HP (100% AKURAT DENGAN PC) ---
+  server.get("/api/monthly-chart", (_, res) => {
+    try {
+      const chartData: any[] = [];
+      const today = new Date();
+      // Tarik semua transaksi mentah
+      const allTx = db
+        .prepare(
+          `SELECT payment_date, total_amount, (total_amount - total_profit) as total_cost FROM transactions`,
+        )
+        .all();
+
+      // Siapkan 6 bulan terakhir
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const label =
+          d.toLocaleString("id-ID", { month: "short" }) +
+          " '" +
+          d.getFullYear().toString().slice(-2);
+
+        let realRevenue = 0,
+          realExpense = 0;
+
+        allTx.forEach((row: any) => {
+          const tDate = new Date(row.payment_date);
+          if (!isNaN(tDate.getTime())) {
+            const tKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, "0")}`;
+            if (tKey === key) {
+              realRevenue += row.total_amount;
+              realExpense += row.total_cost;
+            }
+          }
+        });
+
+        // KUNCI RAHASIA: Ambil data editan manual/ledger seperti di PC
+        const ledger: any = getMonthlyLedger(key);
+        const adjRev = ledger ? ledger.revenue_adj : 0;
+        const adjExp = ledger ? ledger.expense_adj : 0;
+
+        chartData.push({
+          key,
+          label,
+          revenue: realRevenue + adjRev,
+          expense: realExpense + adjExp,
+          profit: realRevenue + adjRev - (realExpense + adjExp),
+          isManual: adjRev !== 0 || adjExp !== 0,
+        });
+      }
+      res.json(chartData);
+    } catch (error: any) {
+      console.error("Gagal load grafik HP:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
   server.post("/api/transactions", (req, res) =>
     res.json(addFinancialRecord(req.body)),
   );

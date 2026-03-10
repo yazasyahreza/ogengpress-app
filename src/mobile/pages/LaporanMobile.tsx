@@ -1,4 +1,15 @@
 import { useState, useEffect, useRef } from "react";
+import {
+  ComposedChart,
+  Line,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 // --- MESIN GETAR (HAPTIC FEEDBACK) ---
 const vibrate = (pattern: number | number[]) => {
@@ -179,7 +190,7 @@ const Icons = {
   ),
 };
 
-// --- KOMPONEN SWIPE CANGGIH ---
+// --- KOMPONEN SWIPE CANGGIH (✨ SUDAH DIPERBAIKI ANTI NYANGKUT ✨) ---
 const SwipeableRow = ({
   children,
   onEdit,
@@ -193,11 +204,13 @@ const SwipeableRow = ({
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
   const startY = useRef(0);
+  const startOffset = useRef(0); // ✨ PERBAIKAN 1: Tambahkan memori posisi awal
   const isSwiping = useRef(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
+    startOffset.current = offset; // ✨ PERBAIKAN 2: Simpan posisi tombol sebelum digeser lagi
     setIsDragging(true);
     isSwiping.current = false;
   };
@@ -217,10 +230,14 @@ const SwipeableRow = ({
       isSwiping.current = true;
     }
 
-    if (diffX > 0 && !showEdit) return;
-    if (diffX < 0 && !showDelete) return;
+    // ✨ PERBAIKAN 3: Kalkulasi targetX berdasarkan startOffset, bukan murni dari tarikan baru!
+    let targetX = startOffset.current + diffX;
 
-    let newOffset = diffX;
+    // ✨ PERBAIKAN 4: Penjagaan arah menggunakan targetX
+    if (targetX > 0 && !showEdit) targetX = 0; // Tidak bisa lebih kanan dari 0 kalau tak ada Edit
+    if (targetX < 0 && !showDelete) targetX = 0; // Tidak bisa lebih kiri dari 0 kalau tak ada Hapus
+
+    let newOffset = targetX;
     if (newOffset > 80) newOffset = 80 + (newOffset - 80) * 0.2;
     if (newOffset < -80) newOffset = -80 + (newOffset + 80) * 0.2;
 
@@ -326,7 +343,10 @@ const SwipeableRow = ({
 };
 
 export default function LaporanMobile() {
-  const [tab, setTab] = useState<"TRANSAKSI" | "ANALISA">("TRANSAKSI");
+  const [tab, setTab] = useState<"TRANSAKSI" | "ANALISA" | "GRAFIK">(
+    "TRANSAKSI",
+  );
+  const [chartData, setChartData] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(
     () => localStorage.getItem("active_date") || getLocalToday(),
   );
@@ -373,7 +393,8 @@ export default function LaporanMobile() {
 
   useEffect(() => {
     if (tab === "TRANSAKSI") loadTransaksi();
-    else loadAnalisa();
+    else if (tab === "ANALISA") loadAnalisa();
+    else if (tab === "GRAFIK") loadGrafik();
   }, [tab, categoryFilter, selectedDate]);
 
   const loadTransaksi = async () => {
@@ -421,6 +442,90 @@ export default function LaporanMobile() {
       setCategories(["Semua", ...(await resCat.json())]);
     } catch (e) {
       console.error("Gagal load analisa");
+    }
+  };
+
+  const loadGrafik = async () => {
+    try {
+      // 1. Coba tembak API Grafik bawaan PC (Jika Bos sudah menyinkronkannya ke server)
+      try {
+        const resChart = await fetch(`http://${ip}:3000/api/monthly-chart`);
+        if (resChart.ok) {
+          const chartData = await resChart.json();
+          // Antisipasi jika data dari server dibungkus dalam object { data: [...] }
+          const dataArray = Array.isArray(chartData)
+            ? chartData
+            : chartData.data;
+          if (dataArray && dataArray.length > 0) {
+            setChartData(dataArray.slice(-6));
+            return; // Jika berhasil tarik dari server, STOP di sini! Data pasti 100% sama dengan PC.
+          }
+        }
+      } catch (err) {
+        // Abaikan dan lanjut ke kalkulasi manual jika API belum siap
+      }
+
+      // 2. Fallback: Kalkulasi Akurat dari Riwayat Transaksi Mentah
+      const res = await fetch(`http://${ip}:3000/api/transactions`);
+      const allData: Transaction[] = await res.json();
+
+      if (!Array.isArray(allData)) return;
+
+      const monthlyStats: Record<string, any> = {};
+      const months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "Mei",
+        "Jun",
+        "Jul",
+        "Ags",
+        "Sep",
+        "Okt",
+        "Nov",
+        "Des",
+      ];
+      const d = new Date();
+
+      // Siapkan wadah 6 bulan terakhir agar grafiknya berjejer rapi
+      for (let i = 5; i >= 0; i--) {
+        const past = new Date(d.getFullYear(), d.getMonth() - i, 1);
+        const monthYear = `${months[past.getMonth()]} '${String(past.getFullYear()).slice(-2)}`;
+        const sortKey = past.getFullYear() * 100 + past.getMonth();
+
+        monthlyStats[monthYear] = {
+          label: monthYear,
+          revenue: 0,
+          expense: 0,
+          profit: 0,
+          sortKey,
+        };
+      }
+
+      // Hitung dengan rumus PERSIS seperti PC (Hanya Laba Kotor)
+      allData.forEach((t) => {
+        const td = new Date(t.date);
+        const monthYear = `${months[td.getMonth()]} '${String(td.getFullYear()).slice(-2)}`;
+
+        // HANYA HITUNG PEMASUKAN (Abaikan Pengeluaran Operasional)
+        if (monthlyStats[monthYear] && t.type === "MASUK") {
+          const omset = t.amount || 0;
+          const laba = t.profit || 0;
+          const modalBarang = omset - laba; // KUNCI AKURASI: Modal = Omset - Laba
+
+          monthlyStats[monthYear].revenue += omset;
+          monthlyStats[monthYear].expense += modalBarang;
+          monthlyStats[monthYear].profit += laba;
+        }
+      });
+
+      const chartArray = Object.values(monthlyStats).sort(
+        (a: any, b: any) => a.sortKey - b.sortKey,
+      );
+      setChartData(chartArray);
+    } catch (e) {
+      console.error("Gagal meracik grafik:", e);
     }
   };
 
@@ -573,6 +678,14 @@ export default function LaporanMobile() {
         }
         /* Sembunyikan scrollbar agar rapi */
         ::-webkit-scrollbar { width: 0px; background: transparent; }
+        
+        /* ✨ JURUS SAPU JAGAT: BUNUH SEMUA OUTLINE DI GRAFIK ✨ */
+        .recharts-wrapper, .recharts-surface, .recharts-wrapper * {
+          outline: none !important;
+        }
+        svg:focus, g:focus, path:focus, rect:focus {
+          outline: none !important;
+        }
       `}</style>
 
       {/* HEADER TABS MINIMALIS */}
@@ -593,7 +706,7 @@ export default function LaporanMobile() {
             padding: "4px",
           }}
         >
-          {["TRANSAKSI", "ANALISA"].map((t) => (
+          {["TRANSAKSI", "ANALISA", "GRAFIK"].map((t) => (
             <div
               key={t}
               onClick={() => {
@@ -831,21 +944,39 @@ export default function LaporanMobile() {
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "center",
+                alignItems: "flex-end",
                 marginBottom: "15px",
               }}
             >
-              <h3
+              <div>
+                <h3
+                  style={{
+                    fontSize: "16px",
+                    color: "#f8fafc",
+                    margin: "0 0 4px 0",
+                    fontWeight: "600",
+                  }}
+                >
+                  Riwayat Transaksi
+                </h3>
+                {/* ✨ INI TAMBAHAN TEKS TOTAL TRANSAKSINYA BOS ✨ */}
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#3b82f6",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Total Hari Ini: {stats.total_transaction} Trx
+                </div>
+              </div>
+              <span
                 style={{
-                  fontSize: "16px",
-                  color: "#f8fafc",
-                  margin: 0,
-                  fontWeight: "600",
+                  fontSize: "11px",
+                  color: "#64748b",
+                  paddingBottom: "2px",
                 }}
               >
-                Riwayat Transaksi
-              </h3>
-              <span style={{ fontSize: "11px", color: "#64748b" }}>
                 Geser untuk opsi
               </span>
             </div>
@@ -1250,9 +1381,124 @@ export default function LaporanMobile() {
             </div>
           </>
         )}
+
+        {/* === TAB GRAFIK BULANAN === */}
+        {tab === "GRAFIK" && (
+          <div
+            style={{
+              background: "#1e293b",
+              padding: "20px 10px",
+              borderRadius: "16px",
+              height: "450px", // Tinggi grafik disesuaikan untuk layar HP
+              border: "1px solid #334155",
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 20px 10px",
+                color: "#f8fafc",
+                fontSize: "15px",
+              }}
+            >
+              Grafik Performa Bulanan
+            </h3>
+            <ResponsiveContainer
+              width="100%"
+              height="85%"
+              style={{ outline: "none" }}
+            >
+              <ComposedChart
+                data={chartData}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                style={{ outline: "none" }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#334155"
+                  vertical={false}
+                  opacity={0.3}
+                />
+                <XAxis
+                  dataKey="label"
+                  stroke="#94a3b8"
+                  fontSize={10}
+                  axisLine={{ stroke: "#475569" }}
+                  tickLine={false}
+                  dy={10}
+                />
+                <YAxis
+                  stroke="#64748b"
+                  fontSize={10}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(num) =>
+                    num >= 1000000
+                      ? (num / 1000000).toFixed(1) + "jt"
+                      : num >= 1000
+                        ? (num / 1000).toFixed(0) + "k"
+                        : num
+                  }
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#0f172a",
+                    borderColor: "#334155",
+                    borderRadius: "8px",
+                    color: "#fff",
+                    fontSize: "12px",
+                    outline: "none",
+                  }}
+                  formatter={(value: any) =>
+                    `Rp ${Number(value).toLocaleString("id-ID")}`
+                  }
+                  cursor={false}
+                />
+                <Legend
+                  verticalAlign="top"
+                  height={36}
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: "11px", opacity: 0.8 }}
+                />
+
+                <Bar
+                  dataKey="revenue"
+                  name="Omset"
+                  fill="#3b82f6"
+                  barSize={12}
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="expense"
+                  name="Modal"
+                  fill="#ec4899"
+                  barSize={12}
+                  radius={[4, 4, 0, 0]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="profit"
+                  name="Profit"
+                  stroke="#fbbf24"
+                  strokeWidth={2}
+                  dot={{
+                    r: 3,
+                    fill: "#1e293b",
+                    stroke: "#fbbf24",
+                    strokeWidth: 2,
+                  }}
+                  activeDot={{
+                    r: 5,
+                    stroke: "none",
+                  }} /* ✨ HAPUS OUTLINE, GANTI STROKE NONE ✨ */
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
-      {/* MODALS SAMA SEPERTI SEBELUMNYA */}
+      {/* MODAL CATAT PENGELUARAN */}
       {showManualModal && (
         <div className="modal-overlay-center">
           <div
@@ -1271,33 +1517,41 @@ export default function LaporanMobile() {
                 marginTop: 0,
                 textAlign: "center",
                 fontSize: "18px",
+                marginBottom: "20px", // ✨ TAMBAHAN: Jarak dari judul ke input
               }}
             >
               Catat Pengeluaran
             </h3>
-            <input
-              placeholder="Keterangan (ex: Bensin)"
-              value={manualForm.name}
-              onChange={(e) =>
-                setManualForm({ ...manualForm, name: e.target.value })
-              }
-              style={inputStyle}
-            />
-            <input
-              type="number"
-              placeholder="Nominal (Rp)"
-              value={manualForm.gross}
-              onChange={(e) =>
-                setManualForm({ ...manualForm, gross: e.target.value })
-              }
-              style={{
-                ...inputStyle,
-                fontSize: "20px",
-                fontWeight: "bold",
-                textAlign: "center",
-              }}
-            />
-            <div style={{ display: "flex", gap: "12px", marginTop: "10px" }}>
+
+            {/* ✨ TAMBAHAN: Bungkus input dengan flex & gap agar ada jarak 15px ✨ */}
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "15px" }}
+            >
+              <input
+                placeholder="Keterangan (ex: Bensin)"
+                value={manualForm.name}
+                onChange={(e) =>
+                  setManualForm({ ...manualForm, name: e.target.value })
+                }
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                placeholder="Nominal (Rp)"
+                value={manualForm.gross}
+                onChange={(e) =>
+                  setManualForm({ ...manualForm, gross: e.target.value })
+                }
+                style={{
+                  ...inputStyle,
+                  fontSize: "20px",
+                  fontWeight: "bold",
+                  textAlign: "center",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
               <button
                 onClick={() => {
                   vibrate(30);
@@ -1431,7 +1685,6 @@ export default function LaporanMobile() {
                 >
                   <option value="TUNAI">TUNAI</option>
                   <option value="QRIS">QRIS</option>
-                  <option value="TRANSFER">TRANSFER</option>
                 </select>
               </>
             ) : (
@@ -1532,7 +1785,7 @@ const inputStyle = {
   background: "#0f172a",
   border: "1px solid #334155",
   color: "white",
-  boxSizing: "border-box" as "border-box",
+  boxSizing: "border-box" as const,
   outline: "none",
 };
 const btnSecondaryStyle = {

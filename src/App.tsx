@@ -3,6 +3,7 @@ import Gudang from "./pages/Gudang";
 import Kasir from "./pages/Kasir";
 import Laporan from "./pages/Laporan";
 import MobileApp from "./mobile/MobileApp";
+import FloatingAi from "./components/FloatingAi";
 import { Product, CartItem } from "./types";
 
 // --- ICONS NAVBAR ---
@@ -55,7 +56,6 @@ const NavIcons = {
 };
 
 function App() {
-  // [PERBAIKAN] Deteksi path mobile lebih kuat agar tidak layar hitam di HP
   const [isMobile, setIsMobile] = useState(window.location.href.includes("/mobile"));
 
   useEffect(() => {
@@ -128,17 +128,9 @@ function App() {
     await window.api.restoreDatabase();
   };
 
-  // [KONTROL RUTE]
   if (isMobile) {
     return <MobileApp />;
   }
-
-  const currentDate = new Date().toLocaleDateString("id-ID", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
 
   return (
     <div
@@ -185,11 +177,36 @@ function App() {
                 fontWeight: "bold",
               }}
             >
-              <div style={{ width: "12px", height: "12px", background: "#fbbf24", borderRadius: "50%" }}></div>
+              <div
+                style={{
+                  width: "12px",
+                  height: "12px",
+                  background: "#fbbf24",
+                  borderRadius: "50%",
+                }}
+              ></div>
             </div>
             <div>
-              <div style={{ fontWeight: "900", fontSize: "1.1rem", letterSpacing: "-0.5px", lineHeight: "1" }}>OGENG PRESS</div>
-              <div style={{ fontSize: "0.65rem", color: "#64748b", letterSpacing: "1px", fontWeight: "500" }}>MANAGEMENT SYSTEM</div>
+              <div
+                style={{
+                  fontWeight: "900",
+                  fontSize: "1.1rem",
+                  letterSpacing: "-0.5px",
+                  lineHeight: "1",
+                }}
+              >
+                OGENG PRESS
+              </div>
+              <div
+                style={{
+                  fontSize: "0.65rem",
+                  color: "#64748b",
+                  letterSpacing: "1px",
+                  fontWeight: "500",
+                }}
+              >
+                MANAGEMENT SYSTEM
+              </div>
             </div>
           </div>
           <div style={{ display: "flex", gap: "10px" }}>
@@ -202,9 +219,15 @@ function App() {
                 key={item.id}
                 onClick={() => setPage(item.id as any)}
                 style={{
-                  background: page === item.id ? "rgba(251, 191, 36, 0.1)" : "transparent",
+                  background:
+                    page === item.id
+                      ? "rgba(251, 191, 36, 0.1)"
+                      : "transparent",
                   color: page === item.id ? "#fbbf24" : "#94a3b8",
-                  border: page === item.id ? "1px solid rgba(251, 191, 36, 0.4)" : "1px solid transparent",
+                  border:
+                    page === item.id
+                      ? "1px solid rgba(251, 191, 36, 0.4)"
+                      : "1px solid transparent",
                   padding: "8px 16px",
                   borderRadius: "8px",
                   cursor: "pointer",
@@ -243,37 +266,41 @@ function App() {
             </div>
           )}
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              color: "#cbd5e1",
-              fontSize: "0.9rem",
-              fontWeight: "500",
-              background: "#1e293b",
-              padding: "8px 14px",
-              borderRadius: "8px",
-              border: "1px solid #334155",
-            }}
-          >
-            <span style={{ color: "#fbbf24", display: "flex" }}>
-              <NavIcons.Calendar />
-            </span>{" "}
-            {currentDate}
-          </div>
-          <div style={{ width: "1px", height: "24px", background: "#334155" }}></div>
-
           <div style={{ display: "flex", gap: "10px" }}>
             <button
               onClick={handleRestore}
-              style={{ background: "transparent", color: "#fbbf24", border: "1px solid #fbbf24", padding: "8px 14px", borderRadius: "6px", cursor: "pointer", fontSize: "0.85rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}
+              style={{
+                background: "transparent",
+                color: "#fbbf24",
+                border: "1px solid #fbbf24",
+                padding: "8px 14px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                fontWeight: "600",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
             >
               <NavIcons.Upload /> Restore
             </button>
             <button
               onClick={handleBackup}
-              style={{ background: "#fbbf24", color: "#0f172a", border: "none", padding: "8px 14px", borderRadius: "6px", cursor: "pointer", fontSize: "0.85rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 4px 6px -1px rgba(251, 191, 36, 0.3)" }}
+              style={{
+                background: "#fbbf24",
+                color: "#0f172a",
+                border: "none",
+                padding: "8px 14px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                fontWeight: "700",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                boxShadow: "0 4px 6px -1px rgba(251, 191, 36, 0.3)",
+              }}
             >
               <NavIcons.Download /> Backup
             </button>
@@ -314,6 +341,7 @@ function App() {
           </div>
         )}
       </div>
+      <FloatingAi />
     </div>
   );
 }

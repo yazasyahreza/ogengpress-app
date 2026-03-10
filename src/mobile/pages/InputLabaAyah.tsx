@@ -229,7 +229,7 @@ export default function InputLabaAyah({ onLogout }: { onLogout: () => void }) {
             <h2 style={{ margin: 0, fontSize: "16px", fontWeight: "700" }}>
               Dashboard
             </h2>
-            <div style={{ fontSize: "12px", color: "#94a3b8" }}>Akses Ayah</div>
+            <div style={{ fontSize: "12px", color: "#94a3b8" }}>Akses Owner</div>
           </div>
         </div>
 

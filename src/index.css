@@ -87,3 +87,14 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+button:focus,
+button:focus-visible,
+input:focus,
+select:focus {
+  outline: none !important;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}

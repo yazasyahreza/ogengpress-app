@@ -74,15 +74,10 @@ const Icons = {
 export default function App() {
   const [role, setRole] = useState(localStorage.getItem("user_role") || "");
   const [page, setPage] = useState<"KASIR" | "LAPORAN" | "GUDANG">("KASIR");
-  const [serverIp, setServerIp] = useState("");
   const [isNavVisible, setIsNavVisible] = useState(true);
   const lastY = useRef(0);
 
   useEffect(() => {
-    const ip = window.location.hostname;
-    localStorage.setItem("server_ip", ip);
-    setServerIp(ip);
-
     if (role !== "KASIR") return;
 
     const handleTouchStart = (e: TouchEvent) => {
@@ -169,7 +164,7 @@ export default function App() {
             boxShadow: "0 4px 15px rgba(59, 130, 246, 0.4)",
           }}
         >
-          Masuk sebagai Yaza
+          Masuk sebagai Kasir
         </button>
         <button
           onClick={() => {
@@ -189,7 +184,7 @@ export default function App() {
             boxShadow: "0 4px 15px rgba(16, 185, 129, 0.4)",
           }}
         >
-          Masuk sebagai Ayah
+          Masuk sebagai Owner
         </button>
       </div>
     );
@@ -311,31 +306,6 @@ export default function App() {
             Keluar
           </span>
         </button>
-      </div>
-
-      <div
-        style={{
-          position: "fixed",
-          top: "10px",
-          right: "10px",
-          pointerEvents: "none",
-          zIndex: 1000,
-          display: "flex",
-          gap: "5px",
-        }}
-      >
-        <span
-          style={{
-            fontSize: "9px",
-            color: "rgba(255,255,255,0.3)",
-            background: "rgba(0,0,0,0.3)",
-            padding: "2px 6px",
-            borderRadius: "4px",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          {serverIp}
-        </span>
       </div>
 
       <AiAssistantMobile />

@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 
 // --- MESIN GETAR (HAPTIC FEEDBACK) ---
-// ✨ INI DIA FUNGSI YANG HILANG TADI BOS! ✨
 const vibrate = (pattern: number | number[]) => {
   if (typeof window !== "undefined" && navigator.vibrate) {
     navigator.vibrate(pattern);
@@ -370,6 +369,7 @@ export default function GudangMobile() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const [filter, setFilter] = useState<"SEMUA" | "KRITIS" | "HABIS">("SEMUA");
+  const [selectedCategory, setSelectedCategory] = useState(""); // ✨ STATE BARU UNTUK KATEGORI MOBILE
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -419,9 +419,20 @@ export default function GudangMobile() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // ✨ Reset ke halaman 1 jika ngetik pencarian atau ganti kategori
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, filter]);
+  }, [debouncedSearch, filter, selectedCategory]);
+
+  // ✨ AMBIL DAFTAR KATEGORI UNIK OTOMATIS
+  const categories = useMemo(() => {
+    return [
+      ...new Set(
+        products.map((p) => p.category).filter((c) => c && c.trim() !== ""),
+      ),
+    ].sort();
+  }, [products]);
 
   const isDuplicate = useMemo(() => {
     if (!form.barcode) return false;
@@ -531,14 +542,11 @@ export default function GudangMobile() {
     return `http://${ip}:3000/uploads/${form.image_url}`;
   };
 
-  // ✨ UPDATE INSTAN (OPTIMISTIC UI) YANG LEBIH AMAN ✨
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isDuplicate) return;
-
     vibrate(30);
 
-    // 1. Siapkan Data Optimis untuk Layar HP
     const optimisticProduct = {
       ...form,
       stock: Number(form.stock),
@@ -547,13 +555,10 @@ export default function GudangMobile() {
       id: isEditMode ? form.id : `temp-${Date.now()}`,
     };
 
-    // 2. Langsung Ganti Layar HP (0 Detik!)
     setProducts((prev) => {
-      if (isEditMode) {
+      if (isEditMode)
         return prev.map((p) => (p.id === form.id ? optimisticProduct : p));
-      } else {
-        return [optimisticProduct, ...prev];
-      }
+      else return [optimisticProduct, ...prev];
     });
 
     if (!isEditMode) {
@@ -563,16 +568,11 @@ export default function GudangMobile() {
         JSON.stringify({ ...form, image_url: "" }),
       );
     }
-
     setShowModal(false);
 
-    // 3. ✨ PERBAIKAN: Tambahkan ": any" agar TypeScript tidak ngamuk saat dihapus ID-nya ✨
     const payloadToServer: any = { ...optimisticProduct };
-    if (!isEditMode) {
-      delete payloadToServer.id; // Sekarang aman dihapus karena sudah berstatus 'any'
-    }
+    if (!isEditMode) delete payloadToServer.id;
 
-    // 4. Kirim ke PC & Cek Responnya
     fetch(`http://${ip}:3000/api/product/save`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -580,12 +580,8 @@ export default function GudangMobile() {
     })
       .then(async (res) => {
         const responseData = await res.json();
-        if (!responseData.success) {
-          // Jika server menolak, lempar error agar ditangkap oleh catch!
+        if (!responseData.success)
           throw new Error(responseData.error || "Ditolak oleh Server PC");
-        }
-
-        // 5. Silent Sync (Jika benar-benar sukses di DB)
         fetch(`http://${ip}:3000/api/products`)
           .then((res) => res.json())
           .then((data) => {
@@ -595,20 +591,17 @@ export default function GudangMobile() {
       .catch((err) => {
         vibrate([50, 100, 50]);
         alert(`⚠️ GAGAL MENYIMPAN! ${err.message}`);
-        fetchData(); // Tarik ulang data asli dari PC agar layar tidak bohong!
+        fetchData();
       });
   };
 
-  // ✨ HAPUS INSTAN (OPTIMISTIC UI) ✨
   const handleDelete = () => {
     if (!isEditMode) return;
     if (confirm("Yakin hapus barang ini?")) {
       vibrate(50);
       const idToDelete = form.id;
-
       setProducts((prev) => prev.filter((p) => p.id !== idToDelete));
       setShowModal(false);
-
       fetch(`http://${ip}:3000/api/product/${idToDelete}`, {
         method: "DELETE",
       }).catch(() => {
@@ -628,11 +621,17 @@ export default function GudangMobile() {
     return { totalItem, totalAset, kritis, habis };
   }, [products]);
 
+  // ✨ SISTEM FILTERING GABUNGAN (SEARCH + KATEGORI + TAB)
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       let passTab = true;
       if (filter === "KRITIS") passTab = p.stock === 1;
       if (filter === "HABIS") passTab = p.stock <= 0;
+
+      const passCategory = selectedCategory
+        ? p.category === selectedCategory
+        : true;
+
       const searchTerms = debouncedSearch
         .toLowerCase()
         .split(" ")
@@ -642,9 +641,10 @@ export default function GudangMobile() {
       const passSearch = searchTerms.every((term) =>
         productDictionary.includes(term),
       );
-      return passTab && passSearch;
+
+      return passTab && passSearch && passCategory;
     });
-  }, [products, debouncedSearch, filter]);
+  }, [products, debouncedSearch, filter, selectedCategory]);
 
   const paginatedProducts = filteredProducts.slice(
     (currentPage - 1) * itemsPerPage,
@@ -663,11 +663,7 @@ export default function GudangMobile() {
       }}
     >
       <style>{`
-        @keyframes pulse-skeleton {
-          0% { background-color: #334155; }
-          50% { background-color: #475569; }
-          100% { background-color: #334155; }
-        }
+        @keyframes pulse-skeleton { 0% { background-color: #334155; } 50% { background-color: #475569; } 100% { background-color: #334155; } }
         .skeleton-pulse { animation: pulse-skeleton 1.5s infinite ease-in-out; }
       `}</style>
 
@@ -782,21 +778,28 @@ export default function GudangMobile() {
         </div>
       </div>
 
-      {/* SEARCH */}
-      <div style={{ padding: "10px 15px", background: "#0f172a" }}>
-        <div style={{ position: "relative" }}>
+      {/* ✨ PENCARIAN & FILTER KATEGORI (BERSEBELAHAN) ✨ */}
+      <div
+        style={{
+          padding: "10px 15px",
+          background: "#0f172a",
+          display: "flex",
+          gap: "10px",
+        }}
+      >
+        <div style={{ position: "relative", flex: 1 }}>
           <input
-            placeholder="Cari nama, rak, kode..."
+            placeholder="Cari nama, rak..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
               width: "100%",
-              padding: "12px 12px 12px 40px",
+              padding: "12px 12px 12px 36px",
               borderRadius: "8px",
               background: "#1e293b",
               color: "white",
               border: "1px solid #3b82f6",
-              fontSize: "14px",
+              fontSize: "13px",
               boxSizing: "border-box",
               outline: "none",
             }}
@@ -804,7 +807,7 @@ export default function GudangMobile() {
           <div
             style={{
               position: "absolute",
-              left: "12px",
+              left: "10px",
               top: "12px",
               color: "#64748b",
             }}
@@ -812,6 +815,32 @@ export default function GudangMobile() {
             <Icons.Search />
           </div>
         </div>
+
+        {/* DROPDOWN KATEGORI */}
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          style={{
+            background: "#1e293b",
+            color: selectedCategory ? "#3b82f6" : "white",
+            border: selectedCategory
+              ? "1px solid #3b82f6"
+              : "1px solid #475569",
+            borderRadius: "8px",
+            padding: "0 8px",
+            outline: "none",
+            maxWidth: "35%", // Agar tidak memakan tempat pencarian terlalu banyak di layar kecil
+            fontSize: "12px",
+            fontWeight: selectedCategory ? "bold" : "normal",
+          }}
+        >
+          <option value="">Semua Kategori</option>
+          {categories.map((c, i) => (
+            <option key={i} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* LIST BARANG */}
@@ -1333,9 +1362,9 @@ const btnFilterStyle = {
   borderRadius: "20px",
   border: "1px solid",
   fontSize: "11px",
-  fontWeight: "bold" as "bold",
+  fontWeight: "bold" as const,
   color: "white",
-  whiteSpace: "nowrap" as "nowrap",
+  whiteSpace: "nowrap" as const,
   cursor: "pointer",
 };
 const labelStyle = {

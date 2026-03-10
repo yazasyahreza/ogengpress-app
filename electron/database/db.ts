@@ -43,13 +43,19 @@ export function initDB() {
   // Migrasi Kolom Baru (Untuk update dari versi lama)
   try {
     db.prepare("ALTER TABLE products ADD COLUMN brand TEXT").run();
-  } catch (e) {}
+  } catch (e) {
+    /* abaikan error */
+  }
   try {
     db.prepare("ALTER TABLE products ADD COLUMN compatibility TEXT").run();
-  } catch (e) {}
+  } catch (e) {
+    /* abaikan error */
+  }
   try {
     db.prepare("ALTER TABLE products ADD COLUMN image_url TEXT").run();
-  } catch (e) {}
+  } catch (e) {
+    /* abaikan error */
+  }
 
   // 2. Tabel Transaksi (Header)
   db.prepare(

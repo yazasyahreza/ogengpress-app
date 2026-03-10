@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useMemo, memo, useCallback } from "react";
 import { Product } from "../types";
 import { compressImage } from "../utils/imageCompressor";
-import AiAssistant from "../components/AiAssistant";
 
 // --- UTILS: DEBOUNCE HOOK ---
 function useDebounce<T>(value: T, delay: number): T {
@@ -486,7 +485,7 @@ export default function Gudang({ onUpdate }: GudangProps) {
   }>({ show: false, msg: "", type: "success" });
   const [editId, setEditId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 300); // Anti-Lag
+  const debouncedSearch = useDebounce(search, 300);
   const [showLowStock, setShowLowStock] = useState(false);
   const [showEmptyStock, setShowEmptyStock] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -526,7 +525,6 @@ export default function Gudang({ onUpdate }: GudangProps) {
   useEffect(() => {
     loadProducts();
   }, []);
-
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearch, showLowStock, showEmptyStock, selectedCategory]);
@@ -657,11 +655,9 @@ export default function Gudang({ onUpdate }: GudangProps) {
   };
 
   const toggleSelectAll = (filteredIds: number[]) => {
-    if (selectedIds.length === filteredIds.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(filteredIds);
-    }
+    selectedIds.length === filteredIds.length
+      ? setSelectedIds([])
+      : setSelectedIds(filteredIds);
   };
   const toggleSelectOne = useCallback((id: number) => {
     setSelectedIds((prev) =>
@@ -724,14 +720,9 @@ export default function Gudang({ onUpdate }: GudangProps) {
       const matchesSearch = searchTerms.every((term) =>
         productDictionary.includes(term),
       );
-
       let matchesStock = true;
-      if (showLowStock) {
-        matchesStock = p.stock === 1;
-      } else if (showEmptyStock) {
-        matchesStock = p.stock === 0;
-      }
-
+      if (showLowStock) matchesStock = p.stock === 1;
+      else if (showEmptyStock) matchesStock = p.stock === 0;
       const matchesCategory = selectedCategory
         ? p.category === selectedCategory
         : true;
@@ -1732,8 +1723,6 @@ export default function Gudang({ onUpdate }: GudangProps) {
           </button>
         </div>
       )}
-
-      <AiAssistant />
     </div>
   );
 }

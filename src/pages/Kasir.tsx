@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Product, CartItem, PaymentMethod } from "../types";
 
 // --- ASSETS: ICONS (Minified) ---

@@ -73,7 +73,6 @@ contextBridge.exposeInMainWorld("api", {
   syncToCloud: () => ipcRenderer.invoke("sync-to-cloud"),
   backupDatabase: () => ipcRenderer.invoke("backup-database"),
   restoreDatabase: () => ipcRenderer.invoke("restore-database"),
-  resetTransactions: () => ipcRenderer.invoke("reset-transactions"), // Reset Data Harian
 
   // AI
   askAI: (prompt: string) => ipcRenderer.invoke("ask-ai", prompt),
