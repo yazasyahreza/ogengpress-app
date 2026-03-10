@@ -385,7 +385,7 @@ export default function LaporanMobile() {
   const [categoryFilter, setCategoryFilter] = useState("Semua");
   const [categories, setCategories] = useState<string[]>([]);
 
-  const ip = localStorage.getItem("server_ip");
+  const ip = window.location.hostname;
 
   useEffect(() => {
     localStorage.setItem("active_date", selectedDate);
