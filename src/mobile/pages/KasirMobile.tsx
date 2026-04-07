@@ -245,7 +245,7 @@ export default function KasirMobile() {
   const [discount, setDiscount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const ip = localStorage.getItem("server_ip");
+  const ip = window.location.hostname;
 
   const activeDate = localStorage.getItem("active_date") || getLocalToday();
   const isTimeMachine = activeDate !== getLocalToday();

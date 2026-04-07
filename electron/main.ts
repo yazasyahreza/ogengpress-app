@@ -112,6 +112,19 @@ app.whenReady().then(async () => {
       if (!API_KEY) throw new Error("API Key belum disetting di file .env!");
 
       const today = new Date();
+
+      // ✨ SUNTIKAN INFO WAKTU UNTUK MENCEGAH HALUSINASI AI ✨
+      const namaHari = [
+        "Minggu",
+        "Senin",
+        "Selasa",
+        "Rabu",
+        "Kamis",
+        "Jumat",
+        "Sabtu",
+      ][today.getDay()];
+      const tglIndo = `${namaHari}, ${today.getDate()} ${today.toLocaleString("id-ID", { month: "long" })} ${today.getFullYear()}`;
+
       const dayOfWeek = today.getDay(); // 0 = Minggu, 1 = Senin, 2 = Selasa, dst
       const offsetThisWeek = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Mundur ke Senin ini
       const offsetLastWeek = offsetThisWeek + 7; // Mundur ke Senin lalu
@@ -120,7 +133,7 @@ app.whenReady().then(async () => {
         .prepare(
           `SELECT COUNT(*) as total_trx, COALESCE(SUM(total_amount), 0) as gross_sales, COALESCE(SUM(total_profit), 0) as net_profit 
            FROM transactions 
-           WHERE date(payment_date) >= date('now', 'localtime', '-${offsetThisWeek} days')`,
+           WHERE substr(payment_date, 1, 10) >= date('now', 'localtime', '-${offsetThisWeek} days')`,
         )
         .get();
 
@@ -128,8 +141,8 @@ app.whenReady().then(async () => {
         .prepare(
           `SELECT COUNT(*) as total_trx, COALESCE(SUM(total_amount), 0) as gross_sales, COALESCE(SUM(total_profit), 0) as net_profit 
            FROM transactions 
-           WHERE date(payment_date) >= date('now', 'localtime', '-${offsetLastWeek} days') 
-           AND date(payment_date) < date('now', 'localtime', '-${offsetThisWeek} days')`,
+           WHERE substr(payment_date, 1, 10) >= date('now', 'localtime', '-${offsetLastWeek} days') 
+           AND substr(payment_date, 1, 10) < date('now', 'localtime', '-${offsetThisWeek} days')`,
         )
         .get();
 
@@ -165,6 +178,10 @@ app.whenReady().then(async () => {
 
       const contextPrompt = `
         Kamu adalah "Master Mekanik Tingkat Dewa" yang sangat jenius, presisi, dan tahu SEMUA hal tentang spesifikasi otomotif roda dua KHUSUS PASAR INDONESIA (Honda, Yamaha, Suzuki, Kawasaki). Kamu juga Asisten di bengkel 'Ogeng Press'.
+
+        === INFO WAKTU SAAT INI (SANGAT PENTING!) ===
+        Hari ini adalah: ${tglIndo}.
+        DILARANG KERAS MENEBAK HARI! Jika Omset Minggu Ini adalah Rp 0, itu murni karena belum ada pembeli/pelanggan yang datang, BUKAN karena ini hari Senin. Jangan berasumsi macam-macam!
 
         === DATA KEUANGAN BENGKEL (Senin - Minggu) ===
         Hanya dibahas jika ditanya.
@@ -313,8 +330,12 @@ app.whenReady().then(async () => {
   // 2. TRANSAKSI & KASIR
   ipcMain.handle(
     "create-transaction",
-    async (_, items, total, discount, paymentMethod) => {
+    async (_, items, total, discount, paymentMethod, activeDate) => {
       try {
+        const txDate = activeDate
+          ? `${activeDate} ${new Date().toLocaleTimeString("id-ID", { hour12: false })}`
+          : null;
+
         const result = db.transaction(() => {
           for (const item of items) {
             if (item.id && typeof item.id === "number") {
@@ -329,11 +350,21 @@ app.whenReady().then(async () => {
             }
           }
           const finalAmount = total - discount;
-          const info = db
-            .prepare(
-              `INSERT INTO transactions (total_amount, discount, final_amount, total_profit, payment_method, payment_date) VALUES (?, ?, ?, 0, ?, datetime('now', 'localtime'))`,
-            )
-            .run(total, discount, finalAmount, paymentMethod);
+
+          let info;
+          if (txDate) {
+            info = db
+              .prepare(
+                `INSERT INTO transactions (total_amount, discount, final_amount, total_profit, payment_method, payment_date) VALUES (?, ?, ?, 0, ?, ?)`,
+              )
+              .run(total, discount, finalAmount, paymentMethod, txDate);
+          } else {
+            info = db
+              .prepare(
+                `INSERT INTO transactions (total_amount, discount, final_amount, total_profit, payment_method, payment_date) VALUES (?, ?, ?, 0, ?, datetime('now', 'localtime'))`,
+              )
+              .run(total, discount, finalAmount, paymentMethod);
+          }
           const transactionId = info.lastInsertRowid;
           let totalProfit = 0;
           for (const item of items) {
@@ -407,13 +438,11 @@ app.whenReady().then(async () => {
           ? parseInt(String(idStr).replace("TX-", ""))
           : Number(idStr);
         const finalAmount = Number(gross) - (Number(discount) || 0);
+
         db.transaction(() => {
           db.prepare(
             `UPDATE transactions SET total_amount=?, discount=?, final_amount=?, total_profit=?, payment_method=? WHERE id=?`,
           ).run(gross, discount, finalAmount, profit, paymentMethod, id);
-          db.prepare(
-            `UPDATE transaction_items SET product_name=? WHERE transaction_id=?`,
-          ).run(itemName, id);
         })();
         return { success: true };
       }
@@ -427,6 +456,40 @@ app.whenReady().then(async () => {
   ipcMain.handle("fetch-today-report", async () => getTodayReport());
   ipcMain.handle("fetch-finance-summary", () => getCombinedFinanceReport());
   ipcMain.handle("fetch-daily-history", async () => getDailyHistory());
+  // ✨ FUNGSI HITUNG TOTALAN MINGGUAN (ANTI-LIMIT) ✨
+  ipcMain.handle("fetch-weekly-stats", (_, startDate, endDate) => {
+    try {
+      const sales: any = db
+        .prepare(
+          `
+        SELECT COALESCE(SUM(total_amount), 0) as gross, 
+               COALESCE(SUM(total_profit), 0) as profit 
+        FROM transactions 
+        WHERE substr(payment_date, 1, 10) >= ? AND substr(payment_date, 1, 10) <= ?
+      `,
+        )
+        .get(startDate, endDate);
+
+      const exps: any = db
+        .prepare(
+          `
+        SELECT COALESCE(SUM(amount), 0) as expense 
+        FROM financial_records 
+        WHERE substr(date, 1, 10) >= ? AND substr(date, 1, 10) <= ?
+      `,
+        )
+        .get(startDate, endDate);
+
+      return {
+        success: true,
+        gross: sales.gross,
+        profit: sales.profit,
+        expense: exps.expense,
+      };
+    } catch (e) {
+      return { success: false, gross: 0, profit: 0, expense: 0 };
+    }
+  });
   ipcMain.handle("add-financial-record", (_, data) => addFinancialRecord(data));
   ipcMain.handle("fetch-monthly-chart", async () => {
     try {

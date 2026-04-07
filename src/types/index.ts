@@ -105,6 +105,7 @@ declare global {
         total: number,
         discount: number,
         paymentMethod: string,
+        activeDate?: string, // ✨ TAMBAHAN BARU
       ) => Promise<{ success: boolean; id?: number; error?: string }>;
 
       deleteTransaction: (
@@ -121,6 +122,15 @@ declare global {
       fetchTodayTransactions: () => Promise<Transaction[]>;
       fetchFinanceSummary: () => Promise<any[]>; // Laporan Gabungan
       fetchDailyHistory: () => Promise<PeriodReport[]>;
+      fetchWeeklyStats: (
+        start: string,
+        end: string,
+      ) => Promise<{
+        success: boolean;
+        gross: number;
+        profit: number;
+        expense: number;
+      }>;
 
       // [UPDATE] Tambah error?: string agar Laporan.tsx tidak merah
       addFinancialRecord: (
@@ -163,9 +173,7 @@ declare global {
         prompt: string,
       ) => Promise<{ success: boolean; text?: string; error?: string }>;
 
-      askAIImage: (
-        base64: string,
-      ) => Promise<{
+      askAIImage: (base64: string) => Promise<{
         success: boolean;
         text?: string;
         searchKeyword?: string;

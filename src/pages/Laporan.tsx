@@ -204,6 +204,11 @@ const Icons = {
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
     </svg>
   ),
+  WhatsApp: () => (
+    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.305-.883-.653-1.48-1.459-1.653-1.756-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
+    </svg>
+  ),
 };
 
 // --- SUB-COMPONENTS ---
@@ -325,9 +330,7 @@ const ProChart = ({
             outline: "none",
           }}
           formatter={(value: any) => formatRp(value)}
-          cursor={{
-            fill: "rgba(255, 255, 255, 0.05)",
-          }}
+          cursor={{ fill: "rgba(255, 255, 255, 0.05)" }}
         />
         <Legend
           verticalAlign="top"
@@ -359,11 +362,7 @@ const ProChart = ({
           stroke="#fbbf24"
           strokeWidth={2}
           dot={{ r: 4, fill: "#1e293b", stroke: "#fbbf24", strokeWidth: 2 }}
-          activeDot={{
-            r: 6,
-            stroke: "none",
-            onClick: handleItemClick,
-          }}
+          activeDot={{ r: 6, stroke: "none", onClick: handleItemClick }}
         />
       </ComposedChart>
     </ResponsiveContainer>
@@ -376,11 +375,12 @@ export default function Laporan() {
   );
 
   const [selectedDate, setSelectedDate] = useState(() => {
+    const savedDate = localStorage.getItem("active_date");
+    if (savedDate) return savedDate;
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
 
-  // --- DATA STATES ---
   const [combinedRecords, setCombinedRecords] = useState<any[]>([]);
   const [stats, setStats] = useState({
     count: 0,
@@ -399,15 +399,12 @@ export default function Laporan() {
     useState<string>("Semua");
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // --- MODAL STATES ---
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-
   const [transactionToDelete, setTransactionToDelete] = useState<
     string | number | null
   >(null);
-
   const [showChartEditModal, setShowChartEditModal] = useState(false);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [showDeleteMissedModal, setShowDeleteMissedModal] = useState(false);
@@ -415,7 +412,6 @@ export default function Laporan() {
     null,
   );
 
-  // --- FORMS ---
   const [chartForm, setChartForm] = useState({
     key: "",
     label: "",
@@ -423,7 +419,6 @@ export default function Laporan() {
     expense: 0,
     isManual: false,
   });
-
   const [editItemForm, setEditItemForm] = useState({
     id: "" as string | number,
     name: "",
@@ -432,13 +427,11 @@ export default function Laporan() {
     profit: "" as string | number,
     payment: "TUNAI" as PaymentMethod,
   });
-
   const [manualForm, setManualForm] = useState({
     name: "",
     gross: "",
     payment: "TUNAI" as PaymentMethod,
   });
-
   const [toast, setToast] = useState<{
     show: boolean;
     msg: string;
@@ -507,6 +500,148 @@ export default function Laporan() {
     }, 3000);
   };
 
+  // ✨ JALUR KHUSUS WA MINGGUAN (ANTI-LIMIT) ✨
+  const handleKirimWA = async () => {
+    try {
+      if (typeof window.api.fetchWeeklyStats !== "function") {
+        showNotification(
+          "Sistem WA belum terhubung ke Database! Restart terminal.",
+          "error",
+        );
+        return;
+      }
+
+      showNotification("Menarik data performa bengkel...", "success");
+
+      const allProducts = await window.api.fetchProducts();
+      const missedData = await window.api.fetchMissedItems();
+      const lowStock = allProducts.filter((p: any) => p.stock <= 3);
+
+      // ✨ HITUNG TANGGAL MINGGU INI & MINGGU LALU ✨
+      const [y, m, d] = selectedDate.split("-").map(Number);
+      const targetDate = new Date(y, m - 1, d);
+
+      const dayOfWeek = targetDate.getDay();
+      const offsetToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+      // -- MINGGU INI (Senin - Minggu)
+      const monday = new Date(y, m - 1, d - offsetToMonday);
+      const sunday = new Date(y, m - 1, d - offsetToMonday + 6);
+
+      const startStr = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+      const endStr = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, "0")}-${String(sunday.getDate()).padStart(2, "0")}`;
+
+      // -- MINGGU LALU (Senin - Minggu sebelumnya)
+      const lastMonday = new Date(y, m - 1, d - offsetToMonday - 7);
+      const lastSunday = new Date(y, m - 1, d - offsetToMonday - 1);
+
+      const lastStartStr = `${lastMonday.getFullYear()}-${String(lastMonday.getMonth() + 1).padStart(2, "0")}-${String(lastMonday.getDate()).padStart(2, "0")}`;
+      const lastEndStr = `${lastSunday.getFullYear()}-${String(lastSunday.getMonth() + 1).padStart(2, "0")}-${String(lastSunday.getDate()).padStart(2, "0")}`;
+
+      // ✨ SEDOT DATA 2 MINGGU SEKALIGUS DARI DATABASE
+      const weekly = await window.api.fetchWeeklyStats(startStr, endStr);
+      const lastWeekly = await window.api.fetchWeeklyStats(
+        lastStartStr,
+        lastEndStr,
+      );
+
+      if (!weekly.success || !lastWeekly.success)
+        throw new Error("Gagal mengambil data SQL");
+
+      // Rekap Minggu Ini
+      const weekOmset = weekly.gross || 0;
+      const weekNetProfit = (weekly.profit || 0) - (weekly.expense || 0);
+
+      // Rekap Minggu Lalu
+      const lastWeekOmset = lastWeekly.gross || 0;
+      const lastWeekNetProfit =
+        (lastWeekly.profit || 0) - (lastWeekly.expense || 0);
+
+      // Format Teks Tanggal Indo
+      const tglIndo = targetDate.toLocaleDateString("id-ID", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+      const tglSeninIndo = monday.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+      });
+      const tglMingguIndo = sunday.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+
+      const tglSeninLaluIndo = lastMonday.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+      });
+      const tglMingguLaluIndo = lastSunday.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+
+      // ✨ MERAKIT PESAN WA SUPER LENGKAP
+      let text = `📊 *LAPORAN OGENG PRESS* 📊\n`;
+      text += `📅 Harian: ${tglIndo}\n\n`;
+
+      text += `💰 *RINGKASAN HARI INI*\n`;
+      text += `- Total Transaksi: ${stats.count}\n`;
+      text += `- Omset Kotor: ${formatRp(stats.gross)}\n`;
+      text += `- Pengeluaran: ${formatRp(stats.expense)}\n`;
+      text += `- Laba Bersih: ${formatRp(stats.profit)}\n`;
+      text += `- Uang di Laci: *${formatRp(stats.cashBalance)}*\n\n`;
+
+      text += `🗓️ *MINGGU INI*\n`;
+      text += `_(${tglSeninIndo} - ${tglMingguIndo})_\n`;
+      text += `- Total Omset: ${formatRp(weekOmset)}\n`;
+      text += `- Laba Bersih: *${formatRp(weekNetProfit)}*\n\n`;
+
+      text += `⏮️ *MINGGU LALU*\n`;
+      text += `_(${tglSeninLaluIndo} - ${tglMingguLaluIndo})_\n`;
+      text += `- Total Omset: ${formatRp(lastWeekOmset)}\n`;
+      text += `- Laba Bersih: *${formatRp(lastWeekNetProfit)}*\n\n`;
+
+      // Hitung Selisih/Tren Performa
+      let selisihOmset = weekOmset - lastWeekOmset;
+      let trenText =
+        selisihOmset >= 0
+          ? `📈 *NAIK* ${formatRp(selisihOmset)}`
+          : `📉 *TURUN* ${formatRp(Math.abs(selisihOmset))}`;
+      text += `📊 *TREN OMSET:* ${trenText}\n\n`;
+
+      if (lowStock.length > 0) {
+        text += `⚠️ *STOK MENIPIS (SEGERA KULAKAN)*\n`;
+        lowStock.slice(0, 15).forEach((p: any) => {
+          text += `- ${p.name} (Sisa: ${p.stock})\n`;
+        });
+        text += `\n`;
+      }
+
+      if (missedData && missedData.length > 0) {
+        text += `📝 *BARANG DICARI PELANGGAN (KOSONG)*\n`;
+        missedData.slice(0, 10).forEach((m: any) => {
+          text += `- ${m.name} (${m.count}x dicari)\n`;
+        });
+        text += `\n`;
+      }
+
+      text += `_Pesan ini dikirim otomatis oleh Sistem_ 🤖`;
+
+      const noWA = "6285150616368"; // GANTI DENGAN NOMOR WA AYAH BOS
+      const waURL = `https://wa.me/${noWA}?text=${encodeURIComponent(text)}`;
+      window.open(waURL, "_blank");
+
+      showNotification("Membuka WhatsApp...", "success");
+    } catch (err: any) {
+      console.error("WA Error:", err);
+      showNotification(err.message || "Gagal membuat laporan WA", "error");
+    }
+  };
+
   const handleAddMissedItem = async () => {
     if (!newMissedItem.trim()) return;
     try {
@@ -558,7 +693,7 @@ export default function Laporan() {
       return alert("Keterangan & Nominal Wajib diisi!");
     try {
       const payload = {
-        date: new Date().toISOString(),
+        date: `${selectedDate}T${new Date().toISOString().split("T")[1]}`,
         type: "KELUAR",
         category: "PENGELUARAN",
         description: manualForm.name,
@@ -584,7 +719,6 @@ export default function Laporan() {
     setTransactionToDelete(id);
     setShowDeleteModal(true);
   };
-
   const confirmDeleteTransaction = async () => {
     if (!transactionToDelete) return;
     try {
@@ -611,12 +745,14 @@ export default function Laporan() {
       typeof t.unique_id === "string" &&
       (t.unique_id.startsWith("TX-") || t.unique_id.startsWith("MAN-"))
     ) {
-      let cleanName = t.description || t.items_summary || "Transaksi Kasir";
+      let cleanName = t.unique_id.startsWith("TX-")
+        ? t.items_summary || "Transaksi Kasir"
+        : t.description || "Pengeluaran";
       cleanName = cleanName
+        .replace(/\s*\(\+ \d+ lainnya\)/g, "")
         .replace(/\s*\(x\d+\)/g, "")
         .replace(/,\s*$/, "")
         .trim();
-
       setEditItemForm({
         id: t.unique_id,
         name: cleanName,
@@ -640,7 +776,6 @@ export default function Laporan() {
         profit: Number(editItemForm.profit) || 0,
         paymentMethod: editItemForm.payment,
       };
-
       const res = await window.api.updateTransaction(
         editItemForm.id as number,
         payload,
@@ -729,13 +864,8 @@ export default function Laporan() {
         .laporan-row:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(2px); }
         .input-manual { width: 100%; padding: 10px; border-radius: 6px; background: #0f172a; border: 1px solid #475569; color: white; outline: none; margin-bottom: 10px; font-size: 0.9rem; }
-        
-        .recharts-wrapper, .recharts-surface, .recharts-wrapper * {
-          outline: none !important;
-        }
-        svg:focus, g:focus, path:focus, rect:focus {
-          outline: none !important;
-        }
+        .recharts-wrapper, .recharts-surface, .recharts-wrapper * { outline: none !important; }
+        svg:focus, g:focus, path:focus, rect:focus { outline: none !important; }
       `}</style>
 
       {/* HEADER UTAMA */}
@@ -778,7 +908,15 @@ export default function Laporan() {
                     e.currentTarget.querySelector("input")?.showPicker();
                   } catch (err) {}
                 }}
+                onDoubleClick={() => {
+                  const d = new Date();
+                  const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                  setSelectedDate(todayStr);
+                  localStorage.removeItem("active_date");
+                  showNotification("Kembali ke Hari Ini");
+                }}
                 className="action-btn"
+                title="Klik 1x Pilih Tanggal | Klik 2x Reset Hari Ini"
                 style={{
                   background: "rgba(59, 130, 246, 0.15)",
                   border: "1px solid rgba(59, 130, 246, 0.4)",
@@ -789,7 +927,6 @@ export default function Laporan() {
                   gap: "8px",
                   userSelect: "none",
                 }}
-                title="Pilih Tanggal Laporan"
               >
                 <Icons.Calendar />
                 <span>
@@ -800,11 +937,20 @@ export default function Laporan() {
                     year: "numeric",
                   })}
                 </span>
-
                 <input
                   type="date"
                   value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    setSelectedDate(newDate);
+                    const d = new Date();
+                    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                    if (newDate === todayStr) {
+                      localStorage.removeItem("active_date");
+                    } else {
+                      localStorage.setItem("active_date", newDate);
+                    }
+                  }}
                   style={{
                     position: "absolute",
                     width: "0",
@@ -814,6 +960,20 @@ export default function Laporan() {
                   }}
                 />
               </div>
+
+              {/* ✨ TOMBOL KIRIM WA ✨ */}
+              <button
+                className="action-btn"
+                onClick={handleKirimWA}
+                style={{
+                  background: "rgba(34, 197, 94, 0.15)",
+                  border: "1px solid rgba(34, 197, 94, 0.4)",
+                  color: "#22c55e",
+                }}
+                title="Kirim Rekap ke WhatsApp"
+              >
+                <Icons.WhatsApp /> Kirim WA
+              </button>
 
               <button
                 className="action-btn"
@@ -1051,6 +1211,7 @@ export default function Laporan() {
                           className="laporan-row"
                           style={{ borderBottom: "1px solid #334155" }}
                         >
+                          {/* ✨ PERBAIKAN: FORMAT JAM AGAR TIDAK INVALID DATE ✨ */}
                           <td
                             style={{
                               padding: "12px 20px",
@@ -1058,11 +1219,25 @@ export default function Laporan() {
                               fontSize: "0.85rem",
                             }}
                           >
-                            {new Date(t.date).toLocaleTimeString("id-ID", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                            {(() => {
+                              if (!t.date) return "-";
+                              const safeStr = t.date.replace(" ", "T");
+                              const d = new Date(safeStr);
+                              if (isNaN(d.getTime())) {
+                                const timePart = t.date.split(" ")[1];
+                                return timePart
+                                  ? timePart.substring(0, 5).replace(":", ".")
+                                  : "-";
+                              }
+                              return d
+                                .toLocaleTimeString("id-ID", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                                .replace(":", ".");
+                            })()}
                           </td>
+
                           <td style={{ padding: "12px 20px" }}>
                             <span
                               style={{
@@ -1134,7 +1309,6 @@ export default function Laporan() {
                               justifyContent: "center",
                             }}
                           >
-                            {/* [PERBAIKAN] Buka gembok edit untuk semua jenis transaksi */}
                             {t.unique_id &&
                               (t.unique_id.startsWith("TX-") ||
                                 t.unique_id.startsWith("MAN-")) && (
@@ -1153,7 +1327,6 @@ export default function Laporan() {
                                   <Icons.Edit />
                                 </button>
                               )}
-
                             {t.unique_id &&
                               (t.unique_id.startsWith("TX-") ||
                                 t.unique_id.startsWith("MAN-")) && (
@@ -1730,7 +1903,7 @@ export default function Laporan() {
                     background: "#0f172a",
                     color: "white",
                     fontSize: "1rem",
-                    boxSizing: "border-box", // ✨ KUNCI PRESISI
+                    boxSizing: "border-box",
                   }}
                 />
               </div>
@@ -1768,7 +1941,7 @@ export default function Laporan() {
                     color: "white",
                     fontSize: "1.2rem",
                     fontWeight: "bold",
-                    boxSizing: "border-box", // ✨ KUNCI PRESISI
+                    boxSizing: "border-box",
                   }}
                 />
               </div>
@@ -1929,7 +2102,6 @@ export default function Laporan() {
         </div>
       )}
 
-      {/* --- PERBAIKAN: MODAL EDIT DINAMIS UNTUK PC --- */}
       {showEditItemModal && (
         <div className="modal-overlay">
           <div
@@ -1955,7 +2127,6 @@ export default function Laporan() {
                 ? "Edit Pengeluaran"
                 : "Edit Transaksi"}
             </h2>
-
             <div style={{ marginBottom: "15px" }}>
               <label
                 style={{
@@ -1974,17 +2145,24 @@ export default function Laporan() {
                 onChange={(e) =>
                   setEditItemForm({ ...editItemForm, name: e.target.value })
                 }
+                readOnly={String(editItemForm.id).startsWith("TX-")}
                 style={{
                   width: "100%",
                   padding: "10px",
-                  background: "#0f172a",
+                  background: String(editItemForm.id).startsWith("TX-")
+                    ? "rgba(15, 23, 42, 0.5)"
+                    : "#0f172a",
                   border: "1px solid #475569",
-                  color: "white",
+                  color: String(editItemForm.id).startsWith("TX-")
+                    ? "#64748b"
+                    : "white",
                   borderRadius: "8px",
+                  cursor: String(editItemForm.id).startsWith("TX-")
+                    ? "not-allowed"
+                    : "text",
                 }}
               />
             </div>
-
             {!String(editItemForm.id).startsWith("MAN") ? (
               <>
                 <div
@@ -2159,7 +2337,6 @@ export default function Laporan() {
                 />
               </div>
             )}
-
             <div style={{ display: "flex", gap: "10px" }}>
               <button
                 onClick={() => setShowEditItemModal(false)}
@@ -2197,7 +2374,6 @@ export default function Laporan() {
         </div>
       )}
 
-      {/* ✨ PERBAIKAN: MODAL EDIT GRAFIK (TAMBAH LABEL & INPUT MODAL) ✨ */}
       {showChartEditModal && (
         <div className="modal-overlay">
           <div
@@ -2212,7 +2388,6 @@ export default function Laporan() {
             <h2 style={{ color: "white", marginTop: 0, marginBottom: "20px" }}>
               Edit Grafik {chartForm.label}
             </h2>
-
             <div style={{ textAlign: "left" }}>
               <label
                 style={{
@@ -2237,7 +2412,6 @@ export default function Laporan() {
                 className="input-manual"
               />
             </div>
-
             <div style={{ textAlign: "left", marginTop: "10px" }}>
               <label
                 style={{
@@ -2262,7 +2436,6 @@ export default function Laporan() {
                 className="input-manual"
               />
             </div>
-
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button
                 onClick={() => setShowChartEditModal(false)}

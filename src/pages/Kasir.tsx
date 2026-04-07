@@ -69,6 +69,22 @@ const Icons = {
       <line x1="5" y1="12" x2="19" y2="12"></line>
     </svg>
   ),
+  History: () => (
+    <svg
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+    >
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
+    </svg>
+  ),
 };
 
 // --- LOGIKA: PENCARIAN PINTAR (Smart Search) ---
@@ -104,13 +120,11 @@ const smartFilter = (products: Product[], query: string): Product[] => {
       `${p.name} ${p.barcode} ${p.brand || ""} ${p.item_number || ""} ${p.compatibility || ""} ${p.category || ""}`.toLowerCase();
     const cleanData = rawData.replace(/[^a-z0-9]/g, "");
 
-    // Cek apakah SEMUA kata kunci user ada di data barang (urutan bebas)
     return queryTerms.every((term) => {
       if (rawData.includes(term)) return true;
       const cleanTerm = term.replace(/[^a-z0-9]/g, "");
       if (cleanTerm.length > 0 && cleanData.includes(cleanTerm)) return true;
 
-      // Fuzzy Logic (Typo tolerance) untuk kata > 3 huruf
       if (term.length > 3) {
         const wordsInData = rawData.split(" ");
         return wordsInData.some(
@@ -164,10 +178,17 @@ const SmartSearch = ({
       setSelectedIndex((prev) => (prev > 0 ? prev - 1 : prev));
     } else if (e.key === "Enter") {
       e.preventDefault();
+
+      if (!query.trim()) {
+        return;
+      }
+
       const exactMatch = products.find((p) => p.barcode === query);
       if (exactMatch) selectItem(exactMatch);
       else if (suggestions.length > 0) selectItem(suggestions[selectedIndex]);
-    } else if (e.key === "Escape") setSuggestions([]);
+    } else if (e.key === "Escape") {
+      setSuggestions([]);
+    }
   };
 
   const selectItem = (p: Product) => {
@@ -213,6 +234,7 @@ const SmartSearch = ({
       </div>
       <div style={{ position: "relative" }}>
         <input
+          id="input-cari-barang"
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -341,12 +363,37 @@ export default function Kasir({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
 
-  // ✨ PERBAIKAN: STATE MANUAL DITAMBAH COST PRICE ✨
   const [manualForm, setManualForm] = useState({
     name: "",
     price: "",
     cost_price: "",
   });
+
+  // ✨ LOGIKA TANGGAL REAKTIF & CCTV MESIN WAKTU ✨
+  const getLocalToday = () => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // Gunakan callback agar tidak mengakses localStorage terus menerus saat re-render
+  const [activeDate, setActiveDate] = useState(() => {
+    return localStorage.getItem("active_date") || getLocalToday();
+  });
+  const isTimeMachine = activeDate !== getLocalToday();
+
+  useEffect(() => {
+    // CCTV memantau perubahan localStorage dari halaman Laporan setiap 0.5 detik
+    const interval = setInterval(() => {
+      const storedDate = localStorage.getItem("active_date") || getLocalToday();
+      if (storedDate !== activeDate) {
+        setActiveDate(storedDate);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [activeDate]);
 
   const formatRp = (num: number) => "Rp " + num.toLocaleString("id-ID");
 
@@ -360,7 +407,6 @@ export default function Kasir({
   const handleAddItem = (product: Product) => {
     const exist = cart.find((c) => c.id === product.id);
     const currentQty = exist ? Number(exist.qty) : 0;
-    // Cek Stok untuk barang DB (id berupa number)
     if (typeof product.id === "number" && currentQty + 1 > product.stock) {
       showNotification(
         `Stok ${product.name} habis! Sisa: ${product.stock}`,
@@ -379,7 +425,6 @@ export default function Kasir({
     }
   };
 
-  // ✨ PERBAIKAN: FUNGSI SUBMIT MANUAL DITAMBAH COST PRICE ✨
   const handleManualSubmit = () => {
     if (!manualForm.name || !manualForm.price)
       return showNotification("Nama & Harga harus diisi!", "error");
@@ -391,7 +436,7 @@ export default function Kasir({
       id: `MANUAL-${Date.now()}`,
       name: manualForm.name,
       price: price,
-      cost_price: cost, // Modal masuk sini
+      cost_price: cost,
       stock: 999999,
       barcode: "MANUAL",
       category: "Manual",
@@ -456,23 +501,34 @@ export default function Kasir({
     setIsProcessing(true);
     const cleanCart = cart.map((c) => ({ ...c, qty: Number(c.qty) || 1 }));
 
-    // [PERBAIKAN] Tidak perlu @ts-ignore karena types/index.ts sudah diupdate
+    // ✨ MENGIRIM TANGGAL AKTIF KE BACKEND ✨
     const res = await window.api.createTransaction(
       cleanCart,
       subTotal,
       discountValue,
       paymentMethod,
+      activeDate,
     );
 
     setIsProcessing(false);
     setShowConfirmModal(false);
     if (res.success) {
-      showNotification("Transaksi Berhasil!", "success");
+      showNotification(
+        `Transaksi Berhasil! ${isTimeMachine ? `(Masuk ke: ${activeDate})` : ""}`,
+        "success",
+      );
       setCart([]);
       setPay("");
       setDiscountInput("");
       setPaymentMethod("TUNAI");
       onSuccess();
+
+      setTimeout(() => {
+        const inputCari = document.getElementById("input-cari-barang");
+        if (inputCari) {
+          inputCari.focus();
+        }
+      }, 100);
     } else {
       showNotification("Gagal: " + res.error, "error");
     }
@@ -480,16 +536,64 @@ export default function Kasir({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      if (e.altKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
-        if (showConfirmModal) handleFinalCheckout();
-        else if (cart.length > 0) handlePreCheckout();
+        const inputUang = document.getElementById("input-uang");
+        if (inputUang) {
+          inputUang.focus();
+        }
+        return;
       }
+
+      if (e.altKey && e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        // Cegah membuka modal jika modal lain sedang terbuka
+        if (!showConfirmModal) {
+          setShowManualModal(true);
+        }
+        return;
+      }
+
+      if (e.altKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        if (cart.length > 0 && !showConfirmModal && !showManualModal) {
+          // Menghapus 1 barang urutan paling bawah di keranjang
+          setCart(cart.slice(0, -1));
+        }
+        return;
+      }
+
+      if (e.key === "Enter") {
+        if (showConfirmModal) {
+          e.preventDefault();
+          handleFinalCheckout();
+          return;
+        }
+
+        if (showManualModal) {
+          e.preventDefault();
+          handleManualSubmit();
+          return;
+        }
+
+        if (cart.length > 0 && !showConfirmModal && !showManualModal) {
+          const activeEl = document.activeElement;
+          const isInput = activeEl?.tagName === "INPUT";
+          const isUangInput = activeEl?.id === "input-uang";
+
+          if (!isInput || isUangInput) {
+            e.preventDefault();
+            handlePreCheckout();
+          }
+        }
+      }
+
       if (e.key === "Escape") {
         if (showConfirmModal) setShowConfirmModal(false);
         if (showManualModal) setShowManualModal(false);
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
@@ -499,6 +603,7 @@ export default function Kasir({
     paymentMethod,
     showConfirmModal,
     showManualModal,
+    manualForm,
   ]);
 
   return (
@@ -662,7 +767,7 @@ export default function Kasir({
         </div>
       )}
 
-      {/* ✨ MODAL INPUT MANUAL PC (DIUBAH) ✨ */}
+      {/* ✨ MODAL INPUT MANUAL PC ✨ */}
       {showManualModal && (
         <div className="modal-overlay">
           <div
@@ -711,7 +816,6 @@ export default function Kasir({
               />
             </div>
 
-            {/* KOTAK HARGA DIBELAH DUA (KIRI MODAL, KANAN JUAL) */}
             <div
               style={{
                 display: "grid",
@@ -878,18 +982,50 @@ export default function Kasir({
           overflow: "hidden",
         }}
       >
-        <h3
+        {/* ✨ HEADER KERANJANG & BADGE HISTORY ✨ */}
+        <div
           style={{
-            marginTop: 0,
-            color: "#f8fafc",
-            marginBottom: "20px",
             display: "flex",
             alignItems: "center",
-            gap: "10px",
+            justifyContent: "space-between",
+            marginBottom: "20px",
           }}
         >
-          🛒 Keranjang Belanja
-        </h3>
+          <h3
+            style={{
+              margin: 0,
+              color: "#f8fafc",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            🛒 Keranjang Belanja
+          </h3>
+
+          {isTimeMachine && (
+            <div
+              style={{
+                background: "rgba(245, 158, 11, 0.1)",
+                border: "1px solid rgba(245, 158, 11, 0.3)",
+                color: "#fbbf24",
+                padding: "6px 12px",
+                borderRadius: "20px",
+                fontSize: "0.75rem",
+                fontWeight: "600",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                letterSpacing: "0.5px",
+              }}
+            >
+              <div style={{ display: "flex", transform: "scale(0.8)" }}>
+                <Icons.History />
+              </div>
+              HISTORY: {activeDate}
+            </div>
+          )}
+        </div>
         <div
           style={{
             flex: 1,
@@ -1219,8 +1355,15 @@ export default function Kasir({
               Uang Diterima
             </label>
             <input
+              id="input-uang"
               value={pay}
               onChange={(e) => setPay(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && cart.length > 0) {
+                  e.preventDefault();
+                  handlePreCheckout();
+                }
+              }}
               placeholder="0"
               type="number"
               style={{

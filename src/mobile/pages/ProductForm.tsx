@@ -84,7 +84,7 @@ export default function ProductForm({
 }: ProductFormProps) {
   const [formData, setFormData] = useState<any>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const ip = localStorage.getItem("server_ip");
+  const ip = window.location.hostname;
 
   // Inisialisasi Data
   useEffect(() => {

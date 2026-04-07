@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld("api", {
     total: number,
     discount: number,
     paymentMethod: string,
+    activeDate?: string,
   ) =>
     ipcRenderer.invoke(
       "create-transaction",
@@ -28,6 +29,7 @@ contextBridge.exposeInMainWorld("api", {
       total,
       discount,
       paymentMethod,
+      activeDate,
     ),
 
   deleteTransaction: (id: number) =>
@@ -42,6 +44,8 @@ contextBridge.exposeInMainWorld("api", {
   fetchTodayTransactions: () => ipcRenderer.invoke("fetch-today-transactions"),
   fetchFinanceSummary: () => ipcRenderer.invoke("fetch-finance-summary"),
   fetchDailyHistory: () => ipcRenderer.invoke("fetch-daily-history"),
+  fetchWeeklyStats: (start: string, end: string) =>
+    ipcRenderer.invoke("fetch-weekly-stats", start, end),
 
   // Mencatat pengeluaran operasional / pemasukan lain
   addFinancialRecord: (data: any) =>

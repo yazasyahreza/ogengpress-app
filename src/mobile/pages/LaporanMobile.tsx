@@ -347,9 +347,13 @@ export default function LaporanMobile() {
     "TRANSAKSI",
   );
   const [chartData, setChartData] = useState<any[]>([]);
-  const [selectedDate, setSelectedDate] = useState(
-    () => localStorage.getItem("active_date") || getLocalToday(),
-  );
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const savedDate = localStorage.getItem("active_date");
+    if (savedDate) return savedDate;
+
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
 
   const [stats, setStats] = useState({
     net_sales: 0,
@@ -773,8 +777,16 @@ export default function LaporanMobile() {
                   type="date"
                   value={selectedDate}
                   onChange={(e) => {
-                    vibrate(40);
-                    setSelectedDate(e.target.value);
+                    const newDate = e.target.value;
+                    setSelectedDate(newDate);
+                    localStorage.setItem("active_date", newDate);
+
+                    // Opsional: Cek jika tanggal yang dipilih adalah hari ini, maka hapus dari localStorage
+                    const d = new Date();
+                    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                    if (newDate === todayStr) {
+                      localStorage.removeItem("active_date");
+                    }
                   }}
                   style={{
                     position: "absolute",
